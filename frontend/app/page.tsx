@@ -3,12 +3,12 @@ import {useState} from "react";
 
 export default function Home() {
   const [message, setMessage] = useState("");
-  const [replay, setReply] = useState("");
+  const [reply, setReply] = useState("");
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   async function sendMessage() {
     if (!message.trim()) return;
-    
+
     try {
       const res = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
@@ -23,6 +23,14 @@ export default function Home() {
     }
   }
   return (
-    <></>
+    <>
+      <input 
+        placeholder="insert test text"
+        value={message} 
+        onChange={(e) => setMessage(e.target.value)} 
+      />
+      <button onClick={sendMessage}>Send</button>
+      {reply && <p>{reply}</p>}
+    </>
   );
 }

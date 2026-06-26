@@ -10,5 +10,6 @@ class Settings(BaseSettings):
     temp_planner: float = 0.4
     temp_interviewer: float = 0.6
     temp_judge: float = 0.0
+    frontend_origin: str = "http://localhost:3000"
     
 settings = Settings()
