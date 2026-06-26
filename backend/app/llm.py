@@ -2,6 +2,7 @@ from abc import ABC, abstractmethod
 from app.config import settings
 from pydantic import BaseModel
 from openai import OpenAI
+from functools import lru_cache
 
 class Usage(BaseModel):
     prompt_tokens: int = 0
@@ -66,9 +67,9 @@ class OpenRouterLLMClient(LLMClient):
             ),
         )
 
+# Cache the LLM client
+@lru_cache
 def get_llm_client() -> LLMClient:
     if settings.use_fake_llm:
         return FakeLLMClient()
-    else:
-        return OpenRouterLLMClient()
-
+    return OpenRouterLLMClient()

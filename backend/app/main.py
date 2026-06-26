@@ -1,4 +1,4 @@
-from fastapi import logger
+import logging
 from fastapi import FastAPI
 from pydantic import BaseModel
 from app.llm import get_llm_client
@@ -6,6 +6,7 @@ from app.config import settings
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi import HTTPException
 
+logger = logging.getLogger(__name__)
 class ChatRequest(BaseModel):
     message: str
 
