@@ -9,3 +9,14 @@ dependencies = [
     "openai>=2.44.0",
     "pydantic-settings>=2.14.2",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.20",
+]
+
+[tool.ruff]
+line-length = 88
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]

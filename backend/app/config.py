@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     use_fake_llm: bool = True
@@ -11,5 +12,6 @@ class Settings(BaseSettings):
     temp_interviewer: float = 0.6
     temp_judge: float = 0.0
     frontend_origin: str = "http://localhost:3000"
-    
+
+
 settings = Settings()
