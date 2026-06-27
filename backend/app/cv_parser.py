@@ -1,7 +1,9 @@
+from io import BytesIO
+
 from pydantic import BaseModel
 from pypdf import PdfReader
+
 from app.config import settings
-from io import BytesIO
 
 
 class CVParseResult(BaseModel):
@@ -13,8 +15,11 @@ def looks_like_real_text(text: str) -> bool:
     stripped = text.strip()
     if len(stripped) < settings.min_cv_chars:
         return False
-    whitespace_ratio = sum(c.isspace() for c in text) / len(text)
-    alpha_ratio = sum(c.isalpha() for c in text) / len(text)
+    whitespace_count = sum(c.isspace() for c in text)
+    non_space = len(text) - whitespace_count
+    whitespace_ratio = whitespace_count / len(text)
+    alpha_ratio = sum(c.isalpha() for c in text) / non_space if non_space else 0.0
+
     return (
         whitespace_ratio >= settings.min_whitespace_ratio
         and alpha_ratio >= settings.min_alpha_ratio

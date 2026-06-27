@@ -2,9 +2,9 @@ from pathlib import Path
 
 import pytest
 from pypdf.errors import PdfReadError
-from app.cv_parser import parse_cv, looks_like_real_text
 
 from app.config import settings
+from app.cv_parser import looks_like_real_text, parse_cv
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -65,3 +65,8 @@ def test_symbol_garble_is_rejected():
 
 def test_too_short_is_rejected():
     assert looks_like_real_text("hi there") is False
+
+def test_per_character_spaced_text_passes():
+    # design-tool PDFs sometimes extract with a space between every glyph
+    spaced = "D i e s  i s t  e i n  e c h t e r  L e b e n s l a u f " * 4
+    assert looks_like_real_text(spaced) is True

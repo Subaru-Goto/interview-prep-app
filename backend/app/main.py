@@ -1,13 +1,13 @@
-from pypdf.errors import PdfReadError
 import logging
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from pypdf.errors import PdfReadError
 
 from app.config import settings
-from app.llm import get_llm_client
 from app.cv_parser import parse_cv
+from app.llm import get_llm_client
 
 logger = logging.getLogger(__name__)
 
