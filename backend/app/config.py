@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     temp_interviewer: float = 0.6
     temp_judge: float = 0.0
     frontend_origin: str = "http://localhost:3000"
+    min_cv_chars: int = 100
+    max_cv_chars: int = 50000
 
 
 settings = Settings()

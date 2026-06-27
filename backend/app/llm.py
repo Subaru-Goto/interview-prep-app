@@ -17,7 +17,7 @@ class CompletionResult(BaseModel):
     usage: Usage
 
 
-class LLMClient(ABC): 
+class LLMClient(ABC):
     @abstractmethod
     def complete(
         self, messages: list[dict], temperature: float = 0.7
@@ -26,7 +26,7 @@ class LLMClient(ABC):
         pass
 
 
-class FakeLLMClient(LLMClient):  
+class FakeLLMClient(LLMClient):
     def complete(
         self, messages: list[dict], temperature: float = 0.7
     ) -> CompletionResult:

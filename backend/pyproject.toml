@@ -8,10 +8,12 @@ dependencies = [
     "fastapi[standard]>=0.138.1",
     "openai>=2.44.0",
     "pydantic-settings>=2.14.2",
+    "pypdf>=6.14.2",
 ]
 
 [dependency-groups]
 dev = [
+    "pytest>=9.1.1",
     "ruff>=0.15.20",
 ]
 
