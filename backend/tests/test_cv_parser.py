@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 from pypdf.errors import PdfReadError
+from app.cv_parser import parse_cv, looks_like_real_text
 
-from app.cv_parser import parse_cv
 from app.config import settings
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -53,3 +53,15 @@ def test_long_text_is_truncated_to_max_chars(monkeypatch):
     result = parse_cv((FIXTURES / "sample_cv.pdf").read_bytes())
     assert result.is_usable is True
     assert len(result.text) == 200
+
+def test_real_text_passes():
+    assert looks_like_real_text("I am a senior software engineer " * 5) is True
+
+def test_no_space_garble_is_rejected():
+    assert looks_like_real_text("JordanMercerSeniorEngineer" * 10) is False
+
+def test_symbol_garble_is_rejected():
+    assert looks_like_real_text("!@#$%^&*()_+{}|<>?" * 20) is False
+
+def test_too_short_is_rejected():
+    assert looks_like_real_text("hi there") is False

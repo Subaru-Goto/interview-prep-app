@@ -17,7 +17,9 @@ End-to-end CV intake: the candidate uploads a PDF, the backend extracts text wit
 
 ## Design notes / known limitation
 
-- The extracted text is **not shown or editable**. The `is_usable` character threshold catches *total* extraction failures (e.g. scans → ~0 chars), but a **partially garbled** parse (multi-column layouts, tables) can reach the interview unseen. Accepted tradeoff for a simpler intake UX; recorded as a README known-limitation.
+- The extracted text is **not shown or editable**. The `is_usable` check catches *total* extraction failures (empty/garbled), but a **partially garbled** parse (multi-column layouts, tables) can reach the interview unseen. Accepted tradeoff for a simpler intake UX; recorded as a README known-limitation.
+- **Quality heuristics:** `is_usable` is judged by a pure `looks_like_real_text()` helper using a minimum character count plus two ratios — **whitespace ratio** (catches "no word boundaries" garble) and **alphabetic ratio** (catches symbol/junk garble). Thresholds live in config and are empirical/tunable.
+- **Known limitation (CJK):** the whitespace-ratio check assumes a space-separated script. Chinese/Japanese/Korean/Thai don't space-separate words, so a CJK CV relies on line breaks for its whitespace; the floor is set low (`0.02`) so realistic multi-line CJK CVs pass, but a dense, few-line CJK extract could be falsely rejected. The alphabetic-ratio check is Unicode-aware and language-neutral.
 - The raw parsed CV text is the source of truth downstream; how it is persisted into session state for the interview is issue 005's concern.
 
 ## Blocked by

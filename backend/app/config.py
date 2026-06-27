@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     min_cv_chars: int = 100
     max_cv_chars: int = 50000
     max_cv_bytes: int = 5 *1024 * 1024 #5MB
-
+    # ratio of whitespace characters
+    min_whitespace_ratio: float = 0.02
+    # ratio of alphabetic characters
+    min_alpha_ratio: float = 0.5
 
 settings = Settings()

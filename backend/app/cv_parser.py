@@ -9,14 +9,20 @@ class CVParseResult(BaseModel):
     is_usable: bool
 
 
+def looks_like_real_text(text: str) -> bool:
+    stripped = text.strip()
+    if len(stripped) < settings.min_cv_chars:
+        return False
+    whitespace_ratio = sum(c.isspace() for c in text) / len(text)
+    alpha_ratio = sum(c.isalpha() for c in text) / len(text)
+    return (
+        whitespace_ratio >= settings.min_whitespace_ratio
+        and alpha_ratio >= settings.min_alpha_ratio
+    )
+
+
 def parse_cv(data: bytes) -> CVParseResult:
-    # Convert bytes to file-like object
     reader = PdfReader(BytesIO(data))
     full_text = "\n".join([t for page in reader.pages if (t := page.extract_text())])
-    if len(full_text.strip()) < settings.min_cv_chars:
-        return CVParseResult(text=full_text, is_usable=False)
-    if len(full_text.strip()) > settings.max_cv_chars:
-        # truncate to max_cv_chars
-        full_text = full_text[: settings.max_cv_chars]
-
-    return CVParseResult(text=full_text, is_usable=True)
+    full_text = full_text[: settings.max_cv_chars]
+    return CVParseResult(text=full_text, is_usable=looks_like_real_text(full_text))
