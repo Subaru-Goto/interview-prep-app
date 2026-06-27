@@ -1,5 +1,6 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
     use_fake_llm: bool = True
@@ -11,5 +12,12 @@ class Settings(BaseSettings):
     temp_interviewer: float = 0.6
     temp_judge: float = 0.0
     frontend_origin: str = "http://localhost:3000"
-    
+    min_cv_chars: int = 100
+    max_cv_chars: int = 50000
+    max_cv_bytes: int = 5 *1024 * 1024 #5MB
+    # ratio of whitespace characters
+    min_whitespace_ratio: float = 0.02
+    # ratio of alphabetic characters
+    min_alpha_ratio: float = 0.5
+
 settings = Settings()
