@@ -1,11 +1,13 @@
+from pypdf.errors import PdfReadError
 import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.config import settings
 from app.llm import get_llm_client
+from app.cv_parser import parse_cv
 
 logger = logging.getLogger(__name__)
 
@@ -45,3 +47,20 @@ def chat(request: ChatRequest):
         logger.error("LLM request failed", exc_info=True)
         raise HTTPException(502, "LLM request failed") from e
     return {"content": response.content}
+
+
+@app.post("/upload-cv")
+async def upload_cv(file: UploadFile = File(...)):
+    if file.content_type != "application/pdf":
+        raise HTTPException(400, "Only PDF files are accepted")
+
+    file_contents = await file.read()
+    if len(file_contents) > settings.max_cv_bytes:
+        raise HTTPException(413, "File is too large")
+
+    try:
+        cv_data = parse_cv(file_contents)
+        return cv_data
+    except PdfReadError as e:
+        logger.error("CV parsing failed", exc_info=True)
+        raise HTTPException(422, "CV parsing failed") from e

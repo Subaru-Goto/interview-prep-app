@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     frontend_origin: str = "http://localhost:3000"
     min_cv_chars: int = 100
     max_cv_chars: int = 50000
+    max_cv_bytes: int = 5 *1024 * 1024 #5MB
 
 
 settings = Settings()
