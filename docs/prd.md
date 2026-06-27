@@ -21,8 +21,8 @@ Voice is out of scope for this MVP — all interaction is text. The interview **
 
 ### Setup & input
 1. As a candidate, I want to upload my CV as a PDF, so that the interview is grounded in my real background without me retyping it.
-2. As a candidate, I want to see the text extracted from my PDF and edit it before starting, so that a bad parse doesn't silently ruin the interview.
-3. As a candidate, I want a clear message when my PDF has no usable text (e.g. a scan), so that I know to paste my CV manually instead of getting a broken interview.
+2. As a candidate, I want clear confirmation that my CV uploaded and parsed successfully (or a clear reason if it failed), so that I know my CV is ready before starting. (The extracted text is **not** shown or editable — it is used as parsed.)
+3. As a candidate, I want a clear message when my PDF has no usable text (e.g. a scan), so that I know to upload a different, text-based PDF instead of getting a broken interview. (CV is PDF-only; there is no copy-paste fallback.)
 4. As a candidate, I want to paste the job description into a text field, so that the interview targets the specific role I'm applying for.
 5. As a candidate, I want the app to reject an empty or unusably short CV/JD before starting, so that I don't waste a session on bad input.
 
@@ -118,7 +118,8 @@ Voice is out of scope for this MVP — all interaction is text. The interview **
 - Voice (text-to-speech / speech-to-text) — written interaction only this MVP.
 - Authentication / user accounts / multi-user concurrency (single-worker, in-memory sessions).
 - Durable persistence (SQLite/DB) and history of past interviews — deferred stretch.
-- `.docx`/image CVs and OCR of scanned PDFs — PDF text extraction only; paste fallback otherwise.
+- `.docx`/image CVs and OCR of scanned PDFs — PDF text extraction only. **CV is PDF-only: there is no copy-paste fallback.** An unreadable/textless PDF is rejected and the candidate uploads a different one.
+- Showing or editing the extracted CV text — the parse is used as-is; the candidate sees only upload success/failure, never the contents.
 - Domains beyond software/data in the MVP (architecture supports adding them later).
 - LangChain / agent frameworks (deferred to a later course chapter).
 - A dev/settings **UI panel**, model-picker UI, image generation, vector DB — config-first instead; UI versions are optional later bonuses.
@@ -126,6 +127,6 @@ Voice is out of scope for this MVP — all interaction is text. The interview **
 
 ## Further Notes
 
-- **Known limitations to document in the README (reflection grade):** in-memory state is single-worker and non-persistent; structured-output support is model-dependent; low temperature reduces but does not guarantee deterministic output (say "more reproducible," not "deterministic"); prompt-injection defense is mitigated, not provably eliminated; PDF parsing fails on scanned documents.
+- **Known limitations to document in the README (reflection grade):** in-memory state is single-worker and non-persistent; structured-output support is model-dependent; low temperature reduces but does not guarantee deterministic output (say "more reproducible," not "deterministic"); prompt-injection defense is mitigated, not provably eliminated; PDF parsing fails on scanned documents; **the extracted CV text is not shown or editable, so a partially garbled parse (e.g. multi-column layouts) can reach the interview unseen — the usability threshold only catches total extraction failures.**
 - **Reflection deliverables:** README covering the 5 prompting techniques + bake-off results, per-role temperature rationale, the user/system/assistant role distinction, output types, the security threat model + jailbreak experiment, and improvement ideas.
 - **Cost discipline:** develop on `gpt-5-nano` with the stub mode; keep bake-off fixtures to 2–3; treat deepeval (token-hungry) as a late, optional, cheap-model chapter; budget ~€10 total OpenRouter credit.
