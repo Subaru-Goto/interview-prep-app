@@ -19,5 +19,6 @@ class Settings(BaseSettings):
     min_whitespace_ratio: float = 0.02
     # ratio of alphabetic characters
     min_alpha_ratio: float = 0.5
-
+    min_jd_chars: int = 200
+    max_jd_chars: int = 20000
 settings = Settings()
