@@ -7,9 +7,9 @@ class SessionNotFound(Exception):
     pass
 
 
-class SessionStore(ABC): 
+class SessionStore(ABC):
     @abstractmethod
-    def save(self, session: Session) -> None: 
+    def save(self, session: Session) -> None:
         pass
 
     @abstractmethod
@@ -25,8 +25,9 @@ class InMemorySessionStore(SessionStore):
         self._sessions[session.session_id] = session
 
     def get(self, session_id: str) -> Session:
-        if session_id not in self.sessions:
-          raise SessionNotFound("Session not found")
-        return self.sessions[session_id]
+        if session_id not in self._sessions:
+            raise SessionNotFound("Session not found")
+        return self._sessions[session_id]
+
 
 session_store = InMemorySessionStore()
