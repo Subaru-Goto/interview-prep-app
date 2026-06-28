@@ -1,0 +1,23 @@
+from app.config import settings
+from app.cv_parser import looks_like_real_text
+
+
+class InvalidInput(Exception):
+    pass
+
+
+def validate_inputs(cv_text: str, jd_text: str) -> str:
+    if not looks_like_real_text(cv_text):
+        raise InvalidInput("No usable CV found — upload your CV first.")
+    stripped_jd_text = jd_text.strip()
+    if len(stripped_jd_text) < settings.min_jd_chars:
+        raise InvalidInput(
+            f"Job description is too short. "
+            f"It must be at least {settings.min_jd_chars} characters."
+        )
+    if len(stripped_jd_text) > settings.max_jd_chars:
+        raise InvalidInput(
+            f"Job description is too long. "
+            f"It must be at most {settings.max_jd_chars} characters."
+        )
+    return stripped_jd_text
