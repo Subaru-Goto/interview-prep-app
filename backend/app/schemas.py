@@ -10,7 +10,7 @@ class InterviewType(str, Enum):
 
 class Seniority(str, Enum):
     """Change how deep agent asks questions"""
-    
+
     junior = "junior"
     mid = "mid"
     senior = "senior"
@@ -41,7 +41,10 @@ class Classification(BaseModel):
 class InterviewTopic(BaseModel):
     title: str = Field(
         min_length=1,
-        description="Short label naming the area to cover, e.g. 'System design'.",
+        description=(
+            "Short label naming the area to cover, e.g. 'System design', "
+            "'business cases', 'statistics', 'A/B testing'."
+        ),
     )
     focus: str = Field(
         min_length=1,
@@ -66,4 +69,35 @@ class InterviewPlan(BaseModel):
         min_length=5,
         max_length=6,
         description="Ordered list of 5-6 topics the interview will cover.",
+    )
+
+
+class MessageRole(str, Enum):
+    """Role of the speaker in the interview."""
+
+    assistant = "assistant"
+    user = "user"
+
+
+class Message(BaseModel):
+    role: MessageRole = Field(description="Role of the speaker in the interview.")
+    content: str = Field(min_length=1, description="Content of the message")
+
+
+class Session(BaseModel):
+    session_id: str = Field(
+        min_length=1, description="Unique identifier for the session."
+    )
+    classification: Classification
+    interview_plan: InterviewPlan
+    transcript: list[Message] = Field(
+        min_length=1,
+        description="Ordered list of messages exchanged during the interview.",
+    )
+    current_topic_index: int = Field(
+        default=0, description="Index of the current topic in the interview plan."
+    )
+    followups_asked: int = Field(
+        default=0,
+        description="Number of follow-up questions asked during the interview.",
     )
