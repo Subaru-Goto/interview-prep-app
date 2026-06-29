@@ -9,6 +9,11 @@ export default function Home() {
   const [cvText, setCVText] = useState("");
   const [jobDescription, setJobDescription] = useState("");
 
+  const [sessionId, setSessionId] = useState("");
+  const [firstQuestion, setFirstQuestion] = useState("");
+  const [startError, setStartError] = useState("");
+  const [isStarting, setIsStarting] = useState(false);
+
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
   async function sendMessage() {
@@ -49,6 +54,33 @@ export default function Home() {
     setCVText(data.text ?? "");
   }
 
+  async function startInterview() {
+    setIsStarting(true);
+    setStartError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/start`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cv_text: cvText, jd_text: jobDescription }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        setStartError("✗ " + (err.detail ?? "Could not start the interview."));
+        return;
+      }
+
+      const data = await res.json();
+      setSessionId(data.session_id);
+      setFirstQuestion(data.first_question);
+    } catch (error) {
+      console.error("Error starting interview:", error);
+      setStartError("✗ An error occurred while starting the interview.");
+    } finally {
+      setIsStarting(false);
+    }
+  }
+
   // UX hints only — backend's validate_inputs is the source of truth.
   const MIN_JD = 200;
   const MAX_JD = 20000;
@@ -62,12 +94,21 @@ export default function Home() {
     ? `Job description needs at least ${MIN_JD} characters (currently ${jdLen}).`
     : "";
 
+  if (sessionId) {
+    return (
+      <main>
+        <h2>Interview</h2>
+        <p>{firstQuestion}</p>
+      </main>
+    );
+  }
+
   return (
     <>
-      <input 
+      <input
         placeholder="insert test text"
-        value={message} 
-        onChange={(e) => setMessage(e.target.value)} 
+        value={message}
+        onChange={(e) => setMessage(e.target.value)}
       />
       <button onClick={sendMessage}>Send</button>
       {content && <p>{content}</p>}
@@ -76,7 +117,7 @@ export default function Home() {
        onChange={(e) => e.target.files?.[0] && uploadCv(e.target.files[0])} />
       {status && <p>{status}</p>}
 
-      <textarea 
+      <textarea
         placeholder="copy and paste job description"
         value={jobDescription}
         maxLength={MAX_JD}
@@ -85,11 +126,10 @@ export default function Home() {
       <p>{jobDescription.length} / {MAX_JD}</p>
 
       {startHint && <p>{startHint}</p>}
-      <button disabled={!canStart}>
-        Start interview
+      <button disabled={!canStart || isStarting} onClick={startInterview}>
+        {isStarting ? "Starting…" : "Start interview"}
       </button>
-
-
+      {startError && <p>{startError}</p>}
     </>
   );
 }
