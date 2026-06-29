@@ -7,6 +7,8 @@ from pypdf.errors import PdfReadError
 
 from app.config import settings
 from app.cv_parser import parse_cv
+from app.input_guard import InvalidInput
+from app.interview_engine import start_interview
 from app.llm import get_llm_client
 
 logger = logging.getLogger(__name__)
@@ -19,6 +21,14 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     content: str | None
 
+
+class StartRequest(BaseModel):
+    cv_text: str
+    jd_text: str
+
+class StartResponse(BaseModel):
+    session_id: str
+    first_question: str
 
 app = FastAPI()
 
@@ -64,3 +74,11 @@ async def upload_cv(file: UploadFile = File(...)):
     except PdfReadError as e:
         logger.error("CV parsing failed", exc_info=True)
         raise HTTPException(422, "CV parsing failed") from e
+
+@app.post("/start", response_model=StartResponse)
+def start(request: StartRequest):
+    try:
+        session_id, question = start_interview(request.cv_text, request.jd_text)
+    except InvalidInput as e:
+        raise HTTPException(400, str(e)) from e
+    return {"session_id": session_id, "first_question": question}
