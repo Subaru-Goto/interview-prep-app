@@ -1,10 +1,11 @@
+import html
+
 from app.config import settings
 from app.cv_parser import looks_like_real_text
 
 
 class InvalidInput(Exception):
     pass
-
 
 def validate_inputs(cv_text: str, jd_text: str) -> str:
     if not looks_like_real_text(cv_text):
@@ -21,3 +22,13 @@ def validate_inputs(cv_text: str, jd_text: str) -> str:
             f"It must be at most {settings.max_jd_chars} characters."
         )
     return stripped_jd_text
+
+# Security layer
+def wrap_untrusted(label: str, text: str) -> str:
+    """Escape the delimiter characters in untrusted text and wrap it in
+    named <label>...</label> tags, so the model treats the content as data
+    and it cannot forge or break out of the delimiters."""
+
+    # quote=False escapes &, <, > but leaves quotes untouched
+    escaped = html.escape(text, quote=False)
+    return f"<{label}>{escaped}</{label}>"

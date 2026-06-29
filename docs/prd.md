@@ -15,7 +15,7 @@ A single-page web app where the candidate:
 2. Is taken through a written, multi-turn **role-play screening interview** by an AI agent. The agent privately plans the interview from the CV + JD, then asks questions one at a time, occasionally following up to probe a weak or strong answer — like a real screener.
 3. Ends the interview (after the planned questions, or early by choice) and receives a **structured feedback report**: an overall assessment, per-topic scores, concrete strengths, gaps, and a recommendation.
 
-Voice is out of scope for this MVP — all interaction is text. The interview **domain is inferred by the agent** (the classifier role) from the job description / title — it is never picked by the candidate. The MVP is tuned to handle software/data roles well; the domain is modeled as an internal parameter so other fields can be added later, but the determination is always the agent's.
+Voice is out of scope for this MVP — all interaction is text. The **interview type and seniority are inferred by the agent** (the classifier role) from the job description / title — they are never picked by the candidate. The MVP supports two text-deliverable interview types — **technical / analytical** (live problem-solving and analytical reasoning) and **behavioral / judgment** (STAR and situational-judgment questions) — plus a **junior / senior** seniority knob that tunes interview depth *within* a type rather than spawning new modes. These are modeled as internal parameters so further types can be added later, but the determination is always the agent's.
 
 ## User Stories
 
@@ -64,7 +64,7 @@ Voice is out of scope for this MVP — all interaction is text. The interview **
 - **Hidden state:** the interview plan and scoring rubric live only server-side and are never sent to the browser.
 
 ### Agent design (four roles, one underlying model)
-- **Classifier** — JD/title → domain (temp ≈ 0.1).
+- **Classifier** — JD/title → interview type + seniority (temp ≈ 0.1).
 - **Planner** — CV + JD → hidden plan of 5–6 topics, via a chain-of-thought planning pass (temp ≈ 0.4).
 - **Interviewer** — asks one question at a time, max one adaptive follow-up per topic, ~8–12 turns total (temp ≈ 0.6).
 - **Judge** — produces the final structured scorecard/feedback (temp ≈ 0.1).
@@ -120,7 +120,7 @@ Voice is out of scope for this MVP — all interaction is text. The interview **
 - Durable persistence (SQLite/DB) and history of past interviews — deferred stretch.
 - `.docx`/image CVs and OCR of scanned PDFs — PDF text extraction only. **CV is PDF-only: there is no copy-paste fallback.** An unreadable/textless PDF is rejected and the candidate uploads a different one. (A **vision/OCR fallback** for unreadable PDFs — escalating to a multimodal LLM when text extraction fails — is captured as a deferred enhancement in `docs/issues/013-stretch-vision-cv-fallback.md`.)
 - Showing or editing the extracted CV text — the parse is used as-is; the candidate sees only upload success/failure, never the contents.
-- Domains beyond software/data in the MVP (architecture supports adding them later).
+- Interview formats beyond the two text-deliverable types — **practical / demonstration** (portfolio critique, work sample, teaching demo) and **interpersonal / role-play** (mock sales call, negotiation) — are out of scope for the MVP: the text-only screening product has no artifact/work-sample channel, and role-play is a later-round format. The architecture supports adding types later.
 - LangChain / agent frameworks (deferred to a later course chapter).
 - A dev/settings **UI panel**, model-picker UI, image generation, vector DB — config-first instead; UI versions are optional later bonuses.
 - deepeval automated evaluation — stretch, only if time allows.
