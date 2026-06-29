@@ -5,6 +5,13 @@ from openai import OpenAI
 from pydantic import BaseModel
 
 from app.config import settings
+from app.schemas import (
+    Classification,
+    InterviewPlan,
+    InterviewTopic,
+    InterviewType,
+    Seniority,
+)
 
 
 class Usage(BaseModel):
@@ -13,31 +20,55 @@ class Usage(BaseModel):
 
 
 class CompletionResult(BaseModel):
-    content: str | None
+    content: str | None = None
+    parsed: BaseModel | None = None
     usage: Usage
 
 
 class LLMClient(ABC):
     @abstractmethod
     def complete(
-        self, messages: list[dict], temperature: float = 0.7
-    ) -> CompletionResult:
-
-        pass
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        response_schema: type[BaseModel] | None = None,
+    ) -> CompletionResult: ...
 
 
 class FakeLLMClient(LLMClient):
     def complete(
-        self, messages: list[dict], temperature: float = 0.7
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        response_schema: type[BaseModel] | None = None,
     ) -> CompletionResult:
-        last_message = messages[-1]["content"]
-        return CompletionResult(
-            content=f"[FAKE LLM] You said: {last_message}",
-            usage=Usage(
-                prompt_tokens=0,
-                completion_tokens=0,
-            ),
-        )
+        usage = Usage()
+
+        if response_schema is None:
+            last_message = messages[-1]["content"]
+            return CompletionResult(
+                content=f"[FAKE LLM] You said: {last_message}",
+                usage=usage,
+            )
+
+        if response_schema is Classification:
+            fake = Classification(
+                interview_type=InterviewType.technical_analytical,
+                seniority=Seniority.mid,
+            )
+            return CompletionResult(parsed=fake, usage=usage)
+
+        if response_schema is InterviewPlan:
+            fake = InterviewPlan(
+                reasoning="Fake reasoning for development.",
+                topics=[
+                    InterviewTopic(title=f"Topic {i}", focus=f"Probe area {i}")
+                    for i in range(5)
+                ],
+            )
+            return CompletionResult(parsed=fake, usage=usage)
+
+        raise ValueError(f"No canned fake response for {response_schema.__name__}")
 
 
 class OpenRouterLLMClient(LLMClient):
@@ -52,18 +83,32 @@ class OpenRouterLLMClient(LLMClient):
         )
 
     def complete(
-        self, messages: list[dict], temperature: float = 0.7
+        self,
+        messages: list[dict],
+        temperature: float = 0.7,
+        response_schema: type[BaseModel] | None = None,
     ) -> CompletionResult:
-        response = self.client.chat.completions.create(
-            model=settings.model, messages=messages, temperature=temperature
+        if response_schema is None:
+            response = self.client.chat.completions.create(
+                model=settings.model, messages=messages, temperature=temperature
+            )
+        else:
+            response = self.client.chat.completions.parse(
+                model=settings.model,
+                messages=messages,
+                temperature=temperature,
+                response_format=response_schema,
+            )
+
+        usage = Usage(
+            prompt_tokens=response.usage.prompt_tokens,
+            completion_tokens=response.usage.completion_tokens,
         )
-        return CompletionResult(
-            content=response.choices[0].message.content,
-            usage=Usage(
-                prompt_tokens=response.usage.prompt_tokens,
-                completion_tokens=response.usage.completion_tokens,
-            ),
-        )
+        message = response.choices[0].message
+
+        if response_schema is None:
+            return CompletionResult(content=message.content, usage=usage)
+        return CompletionResult(parsed=message.parsed, usage=usage)
 
 
 # Cache the LLM client
