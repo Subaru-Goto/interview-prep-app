@@ -49,8 +49,10 @@ class InterviewTopic(BaseModel):
     focus: str = Field(
         min_length=1,
         description=(
-            "Specific, CV-grounded angle to probe for this topic — not a "
-            "restatement of the title."
+            "Specific angle to probe for this topic: what to explore to test "
+            "how well the candidate's background (from the CV) fits what the "
+            "role requires (from the job description). Not a restatement of "
+            "the title."
         ),
     )
 
