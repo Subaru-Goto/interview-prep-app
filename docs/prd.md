@@ -66,7 +66,7 @@ Voice is out of scope for this MVP — all interaction is text. The **interview 
 ### Agent design (four roles, one underlying model)
 - **Classifier** — JD/title → interview type + seniority (temp ≈ 0.1).
 - **Planner** — CV + JD → hidden plan of 5–6 topics, via a chain-of-thought planning pass (temp ≈ 0.4).
-- **Interviewer** — asks one question at a time, max one adaptive follow-up per topic, ~8–12 turns total (temp ≈ 0.6).
+- **Interviewer** — asks one question at a time, up to a configurable follow-up budget per topic (`max_followups_per_topic`, default 1) and a configurable total turn cap (`max_turns`, ~8–12), both enforced by the engine, not the model (temp ≈ 0.6).
 - **Judge** — produces the final structured scorecard/feedback (temp ≈ 0.1).
 - **Temperature is the headline tuned parameter, set per role** (consistency for classifier/judge, variety for interviewer). top-p / frequency penalty discussed in the writeup but not cranked.
 
@@ -86,7 +86,7 @@ Voice is out of scope for this MVP — all interaction is text. The **interview 
 - **Cost is operator data, kept out of the candidate flow.** The backend always computes/logs/returns it; the UI surfaces it only as a **muted footer on the results page** (after the interview ends, so no immersion cost). Richer/live detail is gated behind a generic `DEV_MODE` env flag (off by default) — the same flag that would later reveal an optional dev panel (model picker, temperature sliders, prompt-variant selector).
 
 ### Configuration & cost-control during development
-- **Config-first, no dev UI panel for the MVP.** All tunables (model id, per-role temperatures, active interviewer-prompt variant) centralized in one config object (`pydantic-settings` / `.env`). Default dev model = `gpt-5-nano`.
+- **Config-first, no dev UI panel for the MVP.** All tunables (model id, per-role temperatures, active interviewer-prompt variant, interview budgets — `max_turns` and `max_followups_per_topic`) centralized in one config object (`pydantic-settings` / `.env`). Default dev model = `gpt-5-nano`.
 - **`USE_FAKE_LLM` stub mode** built first, so plumbing/UI/state are developed against canned responses at zero API cost; real calls reserved for prompt-quality testing.
 
 ### Build sequence (A-floor first, cheap-first)
@@ -107,7 +107,7 @@ Voice is out of scope for this MVP — all interaction is text. The **interview 
 - **Prompt registry** — returns the requested variant and assembles a well-formed `messages` array (system + delimited data + transcript).
 
 **Behavioral test (against the stubbed LLM client):**
-- **Interview engine / state machine** — drives the lifecycle correctly: start → classify → plan → ask → reply/probe → finish; enforces the turn cap and the one-follow-up-per-topic rule; honors early end; never exposes the plan/rubric in client-facing payloads.
+- **Interview engine / state machine** — drives the lifecycle correctly: start → classify → plan → ask → reply/probe → finish. Architecture is **"the model proposes, the engine enforces"** — the interviewer LLM makes a bounded per-turn decision (`{follow_up, advance}`), but all hard limits and termination live in deterministic code (the model never chooses `finish`). Enforces the turn cap and the per-topic follow-up rule via a pure, exhaustively-tested transition function; honors early end; never exposes the plan/rubric in client-facing payloads.
 
 **Explicitly NOT unit-tested:** the *quality* of real LLM outputs (question relevance, feedback usefulness). That is evaluated separately via the manual prompt **bake-off** and, as a stretch, **deepeval** metrics — not via assertions on text.
 
