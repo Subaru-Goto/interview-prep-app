@@ -32,3 +32,11 @@ def wrap_untrusted(label: str, text: str) -> str:
     # quote=False escapes &, <, > but leaves quotes untouched
     escaped = html.escape(text, quote=False)
     return f"<{label}>{escaped}</{label}>"
+
+def validate_answer(answer: str) -> str:
+    strip_answer = answer.strip()
+    if len(strip_answer) == 0:
+        raise InvalidInput("Answer cannot be empty")
+    if len(strip_answer) > settings.max_answer_chars:
+        raise InvalidInput(f"It must be most {settings.max_answer_chars} characters.")
+    return strip_answer

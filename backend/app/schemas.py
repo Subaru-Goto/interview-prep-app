@@ -15,7 +15,6 @@ class Seniority(str, Enum):
     mid = "mid"
     senior = "senior"
 
-
 class Classification(BaseModel):
     interview_type: InterviewType = Field(
         description=(
@@ -102,4 +101,33 @@ class Session(BaseModel):
     followups_asked: int = Field(
         default=0,
         description="Number of follow-up questions asked during the interview.",
+    )
+
+class InterviewerAction(str, Enum):
+    """Interviewer's next action"""
+
+    follow_up = "follow_up"
+    advance = "advance"
+
+
+class InterviewerTurn(BaseModel):
+    reasoning: str = Field(
+        min_length=1,
+        description=(
+            "Analyze the candidate's most recent answer before deciding: "
+            "was it complete, vague, or notably strong, and is the current "
+            "topic sufficiently covered? Think here first, then choose the "
+            "action."
+        ),
+    )
+    action: InterviewerAction = Field(
+        description=(
+            "Choose follow_up when the answer is vague, incomplete, or notably "
+            "strong and worth probing further on this topic; choose advance "
+            "when the topic is sufficiently covered."
+        )
+    )
+    question: str = Field(
+        min_length=1,
+        description="The single next question or follow-up to ask the candidate.",
     )
