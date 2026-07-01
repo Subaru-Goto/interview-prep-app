@@ -23,6 +23,7 @@ class Usage(BaseModel):
 
 class CompletionResult(BaseModel):
     content: str | None = None
+    # Parsed can be Classification, InterviewPlan, InterviewTurn or None
     parsed: BaseModel | None = None
     usage: Usage
 
