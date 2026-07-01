@@ -1,3 +1,4 @@
+from enum import Enum
 from uuid import uuid4
 
 from app.config import settings
@@ -12,6 +13,7 @@ from app.prompts import (
 )
 from app.schemas import (
     Classification,
+    InterviewerAction,
     InterviewPlan,
     Message,
     MessageRole,
@@ -53,7 +55,7 @@ def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
         interview_type=classification.interview_type.value,
         seniority=classification.seniority.value,
     )
-    # Get the forst question from the topic context
+
     topic_context = f"Topic: {first_topic.title}\nFocus: {first_topic.focus}"
     first_question = client.complete(
         _messages(interviewer_system, topic_context),
@@ -70,3 +72,30 @@ def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
     session_store.save(session)
 
     return session.session_id, first_question
+
+class Transition(str, Enum):
+    follow_up = "follow_up"
+    advance = "advance"
+    finish = "finish"
+
+def resolve_transition(
+    proposed_action: InterviewerAction,      
+    followups_asked: int,        
+    current_topic_index: int,
+    num_topics: int,
+    questions_asked: int,       
+    max_turns: int,
+    max_followups: int,
+) -> Transition:
+    if questions_asked >= max_turns:
+        return Transition.finish
+    
+    if (proposed_action == InterviewerAction.follow_up
+     and followups_asked < max_followups):
+        return Transition.follow_up
+
+    if current_topic_index < num_topics - 1:
+        return Transition.advance
+    
+    return Transition.finish
+    
