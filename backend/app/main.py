@@ -8,8 +8,9 @@ from pypdf.errors import PdfReadError
 from app.config import settings
 from app.cv_parser import parse_cv
 from app.input_guard import InvalidInput
-from app.interview_engine import start_interview
+from app.interview_engine import reply, start_interview
 from app.llm import get_llm_client
+from app.session_store import SessionNotFound
 
 logger = logging.getLogger(__name__)
 
@@ -82,3 +83,22 @@ def start(request: StartRequest):
     except InvalidInput as e:
         raise HTTPException(400, str(e)) from e
     return {"session_id": session_id, "first_question": question}
+
+
+class ReplyRequest(BaseModel):
+    session_id: str
+    answer: str
+
+class ReplyResponse(BaseModel):
+    done: bool
+    next_question: str | None
+
+@app.post("/reply", response_model=ReplyResponse)
+def submit_reply(request: ReplyRequest):
+    try:
+        done, question = reply(request.session_id, request.answer)
+    except InvalidInput as e:
+        raise HTTPException(400, str(e)) from e
+    except SessionNotFound as e:
+        raise HTTPException(404, str(e)) from e
+    return {"done": done, "next_question": question}
