@@ -87,11 +87,11 @@ export function SetupView({
           </div>
 
           {/* Start */}
-          <div className="mt-6 flex flex-col items-center gap-2.5">
+          <div className="mt-6 flex flex-col items-end gap-2.5">
             <button
               disabled={!canStart || isStarting}
               onClick={onStart}
-              className="w-full rounded-[10px] bg-primary py-3 text-sm font-semibold text-white shadow-lg shadow-primary/30 transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-[10px] bg-primary px-8 py-3 text-sm font-semibold text-white shadow-lg shadow-primary/30 transition-opacity hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {isStarting ? "Starting…" : "Start interview →"}
             </button>
