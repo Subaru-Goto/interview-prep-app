@@ -38,5 +38,7 @@ def validate_answer(answer: str) -> str:
     if len(strip_answer) == 0:
         raise InvalidInput("Answer cannot be empty")
     if len(strip_answer) > settings.max_answer_chars:
-        raise InvalidInput(f"It must be most {settings.max_answer_chars} characters.")
+        raise InvalidInput(
+            f"It must be at most {settings.max_answer_chars} characters."
+        )
     return strip_answer

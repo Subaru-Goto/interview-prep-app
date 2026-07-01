@@ -72,6 +72,54 @@ interview-prep-app/
     └── issues/
 ```
 
+## Security
+
+Untrusted input (CV text, job description, candidate answers) can never be
+trusted to behave — a candidate could try to inject instructions into their
+CV, ask the interviewer to do something unrelated, or try to extract the
+hidden question plan. The app defends against this in layers, on the
+assumption that any single layer could fail:
+
+1. **Data/instruction separation.** Untrusted text is wrapped in named tags
+   (`<cv>`, `<job_description>`, `<candidate_answer>`) with special
+   characters escaped (`app/input_guard.py::wrap_untrusted`), and every
+   system prompt explicitly tells the model to treat content inside those
+   tags as data, never as instructions. Putting a candidate's text in a
+   `user`-role message would not by itself make it trusted — the tags plus
+   the system-prompt rule are what mark it as data.
+2. **Stay-on-task role adherence.** The interviewer's system prompt
+   (`INTERVIEWER_TURN_SYSTEM_PROMPT`) explicitly instructs the model to stay
+   in its interviewer role regardless of what a candidate's answer asks for
+   — refusing off-topic requests (e.g. "write me code"), refusing to reveal
+   the interview topics or scoring rubric, and refusing to follow embedded
+   instructions ("ignore the above") — then redirect back to the current
+   question. The judge's prompt carries an equivalent rule so injected
+   content can't shift a score or leak into the report's wording.
+3. **Input caps.** CV upload is PDF-only with a size limit; JD and answer
+   text have length caps (`app/config.py`); the interview itself is bounded
+   to a max number of turns and follow-ups — all enforced in code, not left
+   to the model to self-limit.
+4. **Server-side secrets.** The interview plan, topic list, and
+   classification are held only in server-side session state and are never
+   included in any API response — `/start`, `/reply`, and `/finish` return
+   only what the candidate is meant to see (tested explicitly in
+   `test_start_endpoint.py::test_start_response_hides_plan_and_classification`).
+   The judge is only ever shown the topics that were actually discussed, not
+   the full plan, so it has nothing to leak about topics never reached.
+5. **Output-side validation.** Every structured model response (
+   classification, interview plan, interviewer turn, scorecard) is parsed
+   through a Pydantic schema with field-level constraints (e.g. scores
+   bounded 1-5, a fixed set of topics). A response that fails validation
+   raises loudly and is caught at the API boundary as a clean error (400/502)
+   — it is never rendered to the candidate as garbage.
+
+**Known limitation:** this is prompt-based defense-in-depth, not a provable
+guarantee — a sufficiently adversarial input could still get partway past
+layer 2. The architecture is designed so that even if the model's behavior
+is imperfect, the things that actually matter (hard turn limits, hidden
+plan/rubric, structural output validity) are enforced in code, not by asking
+the model nicely.
+
 ## Roadmap
 
 Work is tracked as an issue backlog in [`docs/issues/`](docs/issues/), built as thin end-to-end slices: walking skeleton → real OpenRouter client → CV upload → JD input → interview start → answer loop → feedback report, plus security, cost metering, and a prompt bake-off. The full product spec lives in [`docs/prd.md`](docs/prd.md).

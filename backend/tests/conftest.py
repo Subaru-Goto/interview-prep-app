@@ -1,7 +1,9 @@
 import pytest
+from fastapi.testclient import TestClient
 
 from app.config import settings
 from app.llm import get_llm_client
+from app.main import app
 
 
 @pytest.fixture(autouse=True)
@@ -9,6 +11,19 @@ def force_stub_mode(monkeypatch):
     """Force the fake LLM for every test so they stay deterministic (no network)."""
     monkeypatch.setattr(settings, "use_fake_llm", True)
     get_llm_client.cache_clear()
+
+
+@pytest.fixture
+def client():
+    return TestClient(app)
+
+
+@pytest.fixture
+def started_session_id(client, valid_cv, valid_jd):
+    """A session_id from a real /start call, for tests that need an existing
+    session but don't care how it was created."""
+    response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
+    return response.json()["session_id"]
 
 
 @pytest.fixture
