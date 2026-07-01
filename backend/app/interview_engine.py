@@ -197,11 +197,14 @@ def _build_judge_messages(session: Session) -> list[dict]:
         interview_type=session.classification.interview_type.value,
         seniority=session.classification.seniority.value,
     )
-    # Feed the interview topics into the system prompt
-    topics_text = "\n".join(
-        f"- {t.title}: {t.focus}" for t in session.interview_plan.topics
+
+    covered_topics = session.interview_plan.topics[: session.current_topic_index + 1]
+    total_topics = len(session.interview_plan.topics)
+    topics_text = "\n".join(f"- {t.title}: {t.focus}" for t in covered_topics)
+    system += (
+        f"\n\nThis interview was planned to cover {total_topics} topic(s). "
+        f"{len(covered_topics)} of them were actually discussed:\n{topics_text}"
     )
-    system += f"\n\nTopics covered:\n{topics_text}"
 
     # Get the candidate's message and append to the system prompt
     messages = [{"role": "system", "content": system}]
