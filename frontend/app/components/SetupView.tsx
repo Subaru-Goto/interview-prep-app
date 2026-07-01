@@ -52,7 +52,7 @@ export function SetupView({
                 CV parsed — ready to go
               </div>
             ) : (
-              <label className="mt-2.5 flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-line-strong bg-surface px-4 py-4 text-[13px] text-muted transition-colors hover:border-primary hover:text-primary">
+              <label className="mt-2.5 flex cursor-pointer items-center justify-center rounded-lg border border-line-strong bg-surface px-4 py-4 text-[13px] text-muted transition-colors hover:border-primary hover:text-primary">
                 <input
                   type="file"
                   accept="application/pdf"
