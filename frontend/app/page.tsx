@@ -2,6 +2,7 @@
 import { useState } from "react";
 
 import { InterviewView, type Turn } from "./components/InterviewView";
+import type { Scorecard } from "./components/ScorecardView";
 import { SetupView } from "./components/SetupView";
 
 // UX hints only — backend's validators are the source of truth.
@@ -24,6 +25,9 @@ export default function Home() {
   const [isReplying, setIsReplying] = useState(false);
   const [replyError, setReplyError] = useState("");
   const [done, setDone] = useState(false);
+  const [scorecard, setScorecard] = useState<Scorecard | null>(null);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [finishError, setFinishError] = useState("");
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -99,6 +103,7 @@ export default function Home() {
       const data = await res.json();
       if (data.done) {
         setDone(true);
+        await finishInterview();
       } else {
         setTranscript((prev) => [
           ...prev,
@@ -113,6 +118,41 @@ export default function Home() {
     }
   }
 
+  async function finishInterview() {
+    setIsFinishing(true);
+    setFinishError("");
+    try {
+      const res = await fetch(`${API_BASE_URL}/finish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        setFinishError(
+          "✗ " + (err.detail ?? "Could not generate your feedback report."),
+        );
+        return;
+      }
+      const data = await res.json();
+      setScorecard(data);
+    } catch (error) {
+      console.error("Error finishing interview:", error);
+      setFinishError("✗ A network error occurred — please try again.");
+    } finally {
+      setIsFinishing(false);
+    }
+  }
+
+  async function handleEndInterview() {
+    if (!sessionId || done || isFinishing) return;
+    if (!window.confirm("End the interview now and see your feedback report?")) {
+      return;
+    }
+    setDone(true);
+    await finishInterview();
+  }
+
   function restart() {
     // keep cv/jd so a fresh run with the same inputs is one click away
     setSessionId("");
@@ -121,6 +161,9 @@ export default function Home() {
     setDone(false);
     setReplyError("");
     setStartError("");
+    setScorecard(null);
+    setIsFinishing(false);
+    setFinishError("");
   }
 
   const jdLen = jobDescription.trim().length;
@@ -148,6 +191,10 @@ export default function Home() {
           isReplying={isReplying}
           replyError={replyError}
           onRestart={restart}
+          onEndInterview={handleEndInterview}
+          scorecard={scorecard}
+          isFinishing={isFinishing}
+          finishError={finishError}
         />
       ) : (
         <SetupView

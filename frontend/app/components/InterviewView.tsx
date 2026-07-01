@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react";
 
 import { Header } from "./Header";
+import { ScorecardView, type Scorecard } from "./ScorecardView";
 
 export type Turn = {
   role: "interviewer" | "candidate";
@@ -21,6 +22,10 @@ interface InterviewViewProps {
   isReplying: boolean;
   replyError: string;
   onRestart: () => void;
+  onEndInterview: () => void;
+  scorecard: Scorecard | null;
+  isFinishing: boolean;
+  finishError: string;
 }
 
 export function InterviewView({
@@ -33,6 +38,10 @@ export function InterviewView({
   isReplying,
   replyError,
   onRestart,
+  onEndInterview,
+  scorecard,
+  isFinishing,
+  finishError,
 }: InterviewViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -70,7 +79,18 @@ export function InterviewView({
               <span className="font-semibold text-ink">
                 {done ? "Interview complete" : "In progress"}
               </span>
-              <span className="text-faint">Question {questionCount}</span>
+              <div className="flex items-center gap-3">
+                <span className="text-faint">Question {questionCount}</span>
+                {!done && (
+                  <button
+                    onClick={onEndInterview}
+                    disabled={isFinishing}
+                    className="text-primary transition-opacity hover:underline disabled:opacity-50"
+                  >
+                    End interview
+                  </button>
+                )}
+              </div>
             </div>
             <div className="h-1 w-full overflow-hidden rounded-full bg-line">
               <span
@@ -109,10 +129,17 @@ export function InterviewView({
             </div>
           )}
 
-          {done && (
+          {done && scorecard && <ScorecardView scorecard={scorecard} />}
+
+          {done && !scorecard && (
             <div className="rounded-xl border border-line bg-surface px-4 py-3.5 text-center text-[13px] leading-relaxed text-body">
-              That&apos;s the end of the interview — nice work. Your feedback
-              scorecard will appear here soon.
+              {finishError ? (
+                <span className="text-warning">{finishError}</span>
+              ) : (
+                <span className="animate-pulse text-faint">
+                  Generating your feedback report…
+                </span>
+              )}
             </div>
           )}
 

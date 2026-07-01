@@ -2,9 +2,10 @@ import pytest
 
 from app.config import settings
 from app.input_guard import InvalidInput
-from app.interview_engine import reply, start_interview
-from app.schemas import MessageRole, Session
+from app.interview_engine import finish_interview, reply, start_interview
+from app.schemas import MessageRole, Scorecard, Session
 from app.session_store import SessionNotFound, session_store
+
 
 def test_start_interview_returns_session_and_question(valid_cv, valid_jd):
     session_id, question = start_interview(valid_cv, valid_jd)
@@ -93,3 +94,25 @@ def test_reply_rejects_empty_answer(valid_cv, valid_jd):
 def test_reply_unknown_session_raises():
     with pytest.raises(SessionNotFound):
         reply("does-not-exist", "a valid non-empty answer")
+
+
+# --- finish_interview(): the judge call against the stub ---
+
+
+def test_finish_interview_returns_scorecard(valid_cv, valid_jd):
+    session_id, _ = start_interview(valid_cv, valid_jd)
+    reply(session_id, "A reasonable answer about the topic.")
+
+    scorecard = finish_interview(session_id)
+
+    assert isinstance(scorecard, Scorecard)
+    assert 5 <= len(scorecard.topic_scores) <= 6
+    assert scorecard.overall_assessment
+    assert len(scorecard.strengths) >= 2
+    assert len(scorecard.gaps) >= 2
+    assert scorecard.focus_recommendation
+
+
+def test_finish_interview_unknown_session_raises():
+    with pytest.raises(SessionNotFound):
+        finish_interview("does-not-exist")
