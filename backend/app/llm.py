@@ -12,7 +12,9 @@ from app.schemas import (
     InterviewPlan,
     InterviewTopic,
     InterviewType,
+    Scorecard,
     Seniority,
+    TopicScore,
 )
 
 
@@ -23,7 +25,7 @@ class Usage(BaseModel):
 
 class CompletionResult(BaseModel):
     content: str | None = None
-    # Parsed can be Classification, InterviewPlan, InterviewTurn or None
+    # Parsed can be Classification, InterviewPlan, InterviewerTurn, Scorecard, or None
     parsed: BaseModel | None = None
     usage: Usage
 
@@ -76,6 +78,23 @@ class FakeLLMClient(LLMClient):
                 reasoning="Fake reasoning for development.",
                 action=InterviewerAction.follow_up,
                 question="[FAKE LLM] Fake question",
+            )
+            return CompletionResult(parsed=fake, usage=usage)
+
+        if response_schema is Scorecard:
+            fake = Scorecard(
+                overall_assessment="Fake assessment for development.",
+                topic_scores=[
+                    TopicScore(
+                        topic_title=f"Topic {i}",
+                        topic_score=i + 1,
+                        feedback=f"Feedback {i}",
+                    )
+                    for i in range(5)
+                ],
+                strengths=["Strength 1", "Strength 2"],
+                gaps=["Gap 1", "Gap 2"],
+                focus_recommendation="Focus on gaps.",
             )
             return CompletionResult(parsed=fake, usage=usage)
 

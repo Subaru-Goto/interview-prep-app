@@ -2,10 +2,12 @@ from enum import Enum
 from uuid import uuid4
 
 from app.config import settings
-from app.input_guard import(
+from app.input_guard import (
+    InvalidInput,
+    validate_answer,
     validate_inputs,
-    wrap_untrusted, 
-    validate_answer)
+    wrap_untrusted,
+)
 from app.llm import get_llm_client
 from app.prompts import (
     CANDIDATE_ANSWER_TAG,
@@ -15,15 +17,17 @@ from app.prompts import (
     INTERVIEWER_SYSTEM_PROMPT,
     INTERVIEWER_TURN_SYSTEM_PROMPT,
     JD_TAG,
+    JUDGE_SYSTEM_PROMPT,
 )
 from app.schemas import (
     Classification,
     InterviewerAction,
+    InterviewerTurn,
     InterviewPlan,
     Message,
     MessageRole,
+    Scorecard,
     Session,
-    InterviewerTurn
 )
 from app.session_store import session_store
 
@@ -56,7 +60,7 @@ def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
     ).parsed
 
     first_topic = plan.topics[0]
-    # implement the classified roles and 
+    # implement the classified roles and
     interviewer_system = INTERVIEWER_SYSTEM_PROMPT.format(
         interview_type=classification.interview_type.value,
         seniority=classification.seniority.value,
@@ -79,31 +83,36 @@ def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
 
     return session.session_id, first_question
 
+
 class Transition(str, Enum):
     follow_up = "follow_up"
     advance = "advance"
     finish = "finish"
 
+
 def resolve_transition(
-    proposed_action: InterviewerAction,      
-    followups_asked: int,        
+    proposed_action: InterviewerAction,
+    followups_asked: int,
     current_topic_index: int,
     num_topics: int,
-    questions_asked: int,       
+    questions_asked: int,
     max_turns: int,
     max_followups: int,
 ) -> Transition:
     if questions_asked >= max_turns:
         return Transition.finish
-    
-    if (proposed_action == InterviewerAction.follow_up
-     and followups_asked < max_followups):
+
+    if (
+        proposed_action == InterviewerAction.follow_up
+        and followups_asked < max_followups
+    ):
         return Transition.follow_up
 
     if current_topic_index < num_topics - 1:
         return Transition.advance
-    
+
     return Transition.finish
+
 
 def _build_interviewer_messages(session: Session) -> list[dict]:
     topics = session.interview_plan.topics
@@ -136,25 +145,34 @@ def _build_interviewer_messages(session: Session) -> list[dict]:
         messages.append({"role": m.role.value, "content": content})
     return messages
 
+
 def reply(session_id: str, answer: str) -> tuple[bool, str | None]:
-    cleaned_answer = validate_answer(answer) 
+    cleaned_answer = validate_answer(answer)
     session = session_store.get(session_id)
 
     session.transcript.append(Message(role=MessageRole.user, content=cleaned_answer))
 
-    turn = get_llm_client().complete(
-        _build_interviewer_messages(session),
-        temperature=settings.temp_interviewer,
-        response_schema=InterviewerTurn,
-    ).parsed
+    turn = (
+        get_llm_client()
+        .complete(
+            _build_interviewer_messages(session),
+            temperature=settings.temp_interviewer,
+            response_schema=InterviewerTurn,
+        )
+        .parsed
+    )
 
     questions_asked = sum(
         1 for m in session.transcript if m.role == MessageRole.assistant
     )
     outcome = resolve_transition(
-        turn.action, session.followups_asked, session.current_topic_index,
-        len(session.interview_plan.topics), questions_asked,
-        settings.max_turns, settings.max_followups_per_topic,
+        turn.action,
+        session.followups_asked,
+        session.current_topic_index,
+        len(session.interview_plan.topics),
+        questions_asked,
+        settings.max_turns,
+        settings.max_followups_per_topic,
     )
 
     if outcome == Transition.finish:
@@ -174,3 +192,42 @@ def reply(session_id: str, answer: str) -> tuple[bool, str | None]:
     return False, turn.question
 
 
+def _build_judge_messages(session: Session) -> list[dict]:
+    system = JUDGE_SYSTEM_PROMPT.format(
+        interview_type=session.classification.interview_type.value,
+        seniority=session.classification.seniority.value,
+    )
+
+    covered_topics = session.interview_plan.topics[: session.current_topic_index + 1]
+    total_topics = len(session.interview_plan.topics)
+    topics_text = "\n".join(f"- {t.title}: {t.focus}" for t in covered_topics)
+    system += (
+        f"\n\nThis interview was planned to cover {total_topics} topic(s). "
+        f"{len(covered_topics)} of them were actually discussed:\n{topics_text}"
+    )
+
+    # Get the candidate's message and append to the system prompt
+    messages = [{"role": "system", "content": system}]
+    for m in session.transcript:
+        content = m.content
+        if m.role == MessageRole.user:
+            content = wrap_untrusted(CANDIDATE_ANSWER_TAG, content)
+        messages.append({"role": m.role.value, "content": content})
+    return messages
+
+
+def finish_interview(session_id: str) -> Scorecard:
+    session = session_store.get(session_id)
+
+    if not any(m.role == MessageRole.user for m in session.transcript):
+        raise InvalidInput("Answer at least one question before ending the interview.")
+
+    return (
+        get_llm_client()
+        .complete(
+            _build_judge_messages(session),
+            temperature=settings.temp_judge,
+            response_schema=Scorecard,
+        )
+        .parsed
+    )

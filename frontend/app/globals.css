@@ -50,6 +50,11 @@
     0 10px 30px rgb(20 24 40 / 0.07);
 }
 
+html {
+  /* This app is light-themed only — stops browsers from auto-dark-inverting it. */
+  color-scheme: light;
+}
+
 body {
   background: var(--color-canvas);
   color: var(--color-ink);

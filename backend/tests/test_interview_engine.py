@@ -2,9 +2,15 @@ import pytest
 
 from app.config import settings
 from app.input_guard import InvalidInput
-from app.interview_engine import reply, start_interview
-from app.schemas import MessageRole, Session
+from app.interview_engine import (
+    _build_judge_messages,
+    finish_interview,
+    reply,
+    start_interview,
+)
+from app.schemas import MessageRole, Scorecard, Session
 from app.session_store import SessionNotFound, session_store
+
 
 def test_start_interview_returns_session_and_question(valid_cv, valid_jd):
     session_id, question = start_interview(valid_cv, valid_jd)
@@ -30,11 +36,7 @@ def test_plan_is_server_side_only(valid_cv, valid_jd):
 
 def test_start_interview_rejects_invalid_input(valid_jd):
     with pytest.raises(InvalidInput):
-        start_interview("", valid_jd)  # empty CV fails the input guard
-
-
-# --- reply(): the wired state machine, against the stub ---
-
+        start_interview("", valid_jd)
 
 def _assistant_count(session):
     return sum(1 for m in session.transcript if m.role == MessageRole.assistant)
@@ -93,3 +95,45 @@ def test_reply_rejects_empty_answer(valid_cv, valid_jd):
 def test_reply_unknown_session_raises():
     with pytest.raises(SessionNotFound):
         reply("does-not-exist", "a valid non-empty answer")
+
+
+def test_finish_interview_returns_scorecard(valid_cv, valid_jd):
+    session_id, _ = start_interview(valid_cv, valid_jd)
+    reply(session_id, "A reasonable answer about the topic.")
+
+    scorecard = finish_interview(session_id)
+
+    assert isinstance(scorecard, Scorecard)
+    assert 5 <= len(scorecard.topic_scores) <= 6
+    assert scorecard.overall_assessment
+    assert len(scorecard.strengths) >= 2
+    assert len(scorecard.gaps) >= 2
+    assert scorecard.focus_recommendation
+
+
+def test_finish_interview_unknown_session_raises():
+    with pytest.raises(SessionNotFound):
+        finish_interview("does-not-exist")
+
+
+def test_finish_interview_with_no_answers_raises(valid_cv, valid_jd):
+    session_id, _ = start_interview(valid_cv, valid_jd)
+    with pytest.raises(InvalidInput):
+        finish_interview(session_id)
+
+
+def test_judge_messages_only_show_covered_topics(valid_cv, valid_jd):
+    session_id, _ = start_interview(valid_cv, valid_jd)
+    reply(session_id, "first answer")  # stub follows up; stays on topic 0
+    session = session_store.get(session_id)
+
+    system = _build_judge_messages(session)[0]["content"]
+
+    covered = session.interview_plan.topics[: session.current_topic_index + 1]
+    uncovered = session.interview_plan.topics[session.current_topic_index + 1 :]
+    assert uncovered  # sanity check: there really are unreached topics here
+
+    for topic in covered:
+        assert topic.title in system
+    for topic in uncovered:
+        assert topic.title not in system
