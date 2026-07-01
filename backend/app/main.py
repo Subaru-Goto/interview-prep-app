@@ -9,18 +9,10 @@ from app.config import settings
 from app.cv_parser import parse_cv
 from app.input_guard import InvalidInput
 from app.interview_engine import finish_interview, reply, start_interview
-from app.llm import get_llm_client
 from app.schemas import Scorecard
 from app.session_store import SessionNotFound
 
 logger = logging.getLogger(__name__)
-
-
-class ChatRequest(BaseModel):
-    message: str
-
-class ChatResponse(BaseModel):
-    content: str | None
 
 
 class StartRequest(BaseModel):
@@ -42,25 +34,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-
-@app.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest):
-    user_messages = [{"role": "user", "content": request.message}]
-    try:
-        llm = get_llm_client()
-    except ValueError as e:
-        # API key missing
-        logger.error("LLM client init failed", exc_info=True)
-        raise HTTPException(500, "Server is misconfigured") from e
-
-    try:
-        response = llm.complete(user_messages)
-    except Exception as e:
-        # LLM/network issue
-        logger.error("LLM request failed", exc_info=True)
-        raise HTTPException(502, "LLM request failed") from e
-    return {"content": response.content}
 
 
 @app.post("/upload-cv")
@@ -85,6 +58,9 @@ def start(request: StartRequest):
         session_id, question = start_interview(request.cv_text, request.jd_text)
     except InvalidInput as e:
         raise HTTPException(400, str(e)) from e
+    except Exception as e:
+        logger.error("Start request failed", exc_info=True)
+        raise HTTPException(502, "Could not start the interview") from e
     return {"session_id": session_id, "first_question": question}
 
 
@@ -104,6 +80,9 @@ def submit_reply(request: ReplyRequest):
         raise HTTPException(400, str(e)) from e
     except SessionNotFound as e:
         raise HTTPException(404, str(e)) from e
+    except Exception as e:
+        logger.error("Reply request failed", exc_info=True)
+        raise HTTPException(502, "Could not process your reply") from e
     return {"done": done, "next_question": question}
 
 @app.post("/finish", response_model=Scorecard)

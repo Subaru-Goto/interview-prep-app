@@ -25,3 +25,14 @@ def test_start_response_hides_plan_and_classification(valid_cv, valid_jd):
 def test_start_rejects_invalid_input(valid_jd):
     response = client.post("/start", json={"cv_text": "", "jd_text": valid_jd})
     assert response.status_code == 400
+
+
+def test_start_returns_502_when_llm_fails(monkeypatch, valid_cv, valid_jd):
+    def broken():
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr("app.interview_engine.get_llm_client", broken)
+
+    response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
+
+    assert response.status_code == 502

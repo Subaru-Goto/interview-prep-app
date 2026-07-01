@@ -3,6 +3,7 @@ import pytest
 from app.config import settings
 from app.input_guard import InvalidInput
 from app.interview_engine import (
+    _build_interviewer_messages,
     _build_judge_messages,
     finish_interview,
     reply,
@@ -70,6 +71,16 @@ def test_reply_enforces_one_followup_then_advances(valid_cv, valid_jd):
     session = session_store.get(session_id)
     assert session.current_topic_index == 1  # engine forced the advance
     assert session.followups_asked == 0      # counter reset on advance
+
+
+def test_interviewer_prompt_includes_stay_on_task_guard(valid_cv, valid_jd):
+    session_id, _ = start_interview(valid_cv, valid_jd)
+    session = session_store.get(session_id)
+
+    system = _build_interviewer_messages(session)[0]["content"].lower()
+
+    assert "stay in the interviewer role" in system
+    assert "rubric" in system
 
 
 def test_reply_is_bounded_and_finishes(valid_cv, valid_jd):
