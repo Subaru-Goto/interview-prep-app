@@ -58,6 +58,9 @@ def start(request: StartRequest):
         session_id, question = start_interview(request.cv_text, request.jd_text)
     except InvalidInput as e:
         raise HTTPException(400, str(e)) from e
+    except ValueError as e:
+        logger.error("Start request: server misconfigured", exc_info=True)
+        raise HTTPException(500, "Server is misconfigured") from e
     except Exception as e:
         logger.error("Start request failed", exc_info=True)
         raise HTTPException(502, "Could not start the interview") from e
@@ -80,6 +83,9 @@ def submit_reply(request: ReplyRequest):
         raise HTTPException(400, str(e)) from e
     except SessionNotFound as e:
         raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        logger.error("Reply request: server misconfigured", exc_info=True)
+        raise HTTPException(500, "Server is misconfigured") from e
     except Exception as e:
         logger.error("Reply request failed", exc_info=True)
         raise HTTPException(502, "Could not process your reply") from e
@@ -93,6 +99,9 @@ def finish_and_feedback(request: FinishRequest):
         raise HTTPException(400, str(e)) from e
     except SessionNotFound as e:
         raise HTTPException(404, str(e)) from e
+    except ValueError as e:
+        logger.error("Judge request: server misconfigured", exc_info=True)
+        raise HTTPException(500, "Server is misconfigured") from e
     except Exception as e:
         logger.error("Judge request failed", exc_info=True)
         raise HTTPException(502, "Judge failed to produce a valid scorecard") from e

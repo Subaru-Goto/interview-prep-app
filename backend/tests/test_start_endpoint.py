@@ -1,11 +1,4 @@
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-def test_start_returns_session_and_question(valid_cv, valid_jd):
+def test_start_returns_session_and_question(client, valid_cv, valid_jd):
     response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
     assert response.status_code == 200
     body = response.json()
@@ -13,7 +6,7 @@ def test_start_returns_session_and_question(valid_cv, valid_jd):
     assert body["first_question"]
 
 
-def test_start_response_hides_plan_and_classification(valid_cv, valid_jd):
+def test_start_response_hides_plan_and_classification(client, valid_cv, valid_jd):
     response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
     body = response.json()
     # the payload exposes ONLY these two fields — hidden state stays server-side
@@ -22,12 +15,12 @@ def test_start_response_hides_plan_and_classification(valid_cv, valid_jd):
         assert leaked not in body
 
 
-def test_start_rejects_invalid_input(valid_jd):
+def test_start_rejects_invalid_input(client, valid_jd):
     response = client.post("/start", json={"cv_text": "", "jd_text": valid_jd})
     assert response.status_code == 400
 
 
-def test_start_returns_502_when_llm_fails(monkeypatch, valid_cv, valid_jd):
+def test_start_returns_502_when_llm_fails(client, monkeypatch, valid_cv, valid_jd):
     def broken():
         raise RuntimeError("boom")
 
@@ -36,3 +29,14 @@ def test_start_returns_502_when_llm_fails(monkeypatch, valid_cv, valid_jd):
     response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
 
     assert response.status_code == 502
+
+
+def test_start_returns_500_when_misconfigured(client, monkeypatch, valid_cv, valid_jd):
+    def missing_api_key():
+        raise ValueError("OPENROUTER_API_KEY not set")
+
+    monkeypatch.setattr("app.interview_engine.get_llm_client", missing_api_key)
+
+    response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
+
+    assert response.status_code == 500

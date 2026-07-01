@@ -9,6 +9,7 @@ from app.interview_engine import (
     reply,
     start_interview,
 )
+from app.prompts import JUDGE_ANTI_INJECTION_GUARD, STAY_ON_TASK_GUARD
 from app.schemas import MessageRole, Scorecard, Session
 from app.session_store import SessionNotFound, session_store
 
@@ -77,10 +78,19 @@ def test_interviewer_prompt_includes_stay_on_task_guard(valid_cv, valid_jd):
     session_id, _ = start_interview(valid_cv, valid_jd)
     session = session_store.get(session_id)
 
-    system = _build_interviewer_messages(session)[0]["content"].lower()
+    system = _build_interviewer_messages(session)[0]["content"]
 
-    assert "stay in the interviewer role" in system
-    assert "rubric" in system
+    assert STAY_ON_TASK_GUARD in system
+
+
+def test_judge_prompt_includes_anti_injection_guard(valid_cv, valid_jd):
+    session_id, _ = start_interview(valid_cv, valid_jd)
+    reply(session_id, "first answer")
+    session = session_store.get(session_id)
+
+    system = _build_judge_messages(session)[0]["content"]
+
+    assert JUDGE_ANTI_INJECTION_GUARD in system
 
 
 def test_reply_is_bounded_and_finishes(valid_cv, valid_jd):

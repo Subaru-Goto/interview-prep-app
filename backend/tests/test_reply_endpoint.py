@@ -1,20 +1,6 @@
-from fastapi.testclient import TestClient
-
-from app.main import app
-
-client = TestClient(app)
-
-
-def _start_session(valid_cv, valid_jd):
-    response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
-    return response.json()["session_id"]
-
-
-def test_reply_returns_next_question(valid_cv, valid_jd):
-    session_id = _start_session(valid_cv, valid_jd)
-
+def test_reply_returns_next_question(client, started_session_id):
     response = client.post(
-        "/reply", json={"session_id": session_id, "answer": "an answer"}
+        "/reply", json={"session_id": started_session_id, "answer": "an answer"}
     )
 
     assert response.status_code == 200
@@ -23,28 +9,39 @@ def test_reply_returns_next_question(valid_cv, valid_jd):
     assert body["next_question"]
 
 
-def test_reply_rejects_empty_answer():
+def test_reply_rejects_empty_answer(client):
     response = client.post("/reply", json={"session_id": "irrelevant", "answer": "  "})
     assert response.status_code == 400
 
 
-def test_reply_unknown_session_returns_404():
+def test_reply_unknown_session_returns_404(client):
     response = client.post(
         "/reply", json={"session_id": "does-not-exist", "answer": "an answer"}
     )
     assert response.status_code == 404
 
 
-def test_reply_returns_502_when_llm_fails(monkeypatch, valid_cv, valid_jd):
-    session_id = _start_session(valid_cv, valid_jd)
-
+def test_reply_returns_502_when_llm_fails(client, monkeypatch, started_session_id):
     def broken():
         raise RuntimeError("boom")
 
     monkeypatch.setattr("app.interview_engine.get_llm_client", broken)
 
     response = client.post(
-        "/reply", json={"session_id": session_id, "answer": "an answer"}
+        "/reply", json={"session_id": started_session_id, "answer": "an answer"}
     )
 
     assert response.status_code == 502
+
+
+def test_reply_returns_500_when_misconfigured(client, monkeypatch, started_session_id):
+    def missing_api_key():
+        raise ValueError("OPENROUTER_API_KEY not set")
+
+    monkeypatch.setattr("app.interview_engine.get_llm_client", missing_api_key)
+
+    response = client.post(
+        "/reply", json={"session_id": started_session_id, "answer": "an answer"}
+    )
+
+    assert response.status_code == 500
