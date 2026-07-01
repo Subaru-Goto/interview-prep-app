@@ -116,3 +116,9 @@ def test_finish_interview_returns_scorecard(valid_cv, valid_jd):
 def test_finish_interview_unknown_session_raises():
     with pytest.raises(SessionNotFound):
         finish_interview("does-not-exist")
+
+
+def test_finish_interview_with_no_answers_raises(valid_cv, valid_jd):
+    session_id, _ = start_interview(valid_cv, valid_jd)
+    with pytest.raises(InvalidInput):
+        finish_interview(session_id)

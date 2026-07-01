@@ -154,13 +154,23 @@ class TopicScore(BaseModel):
 
 class Scorecard(BaseModel):
     topic_scores: list[TopicScore] = Field(
-        min_length=5, max_length=6, description="Ordered list of topic scores."
+        min_length=1,
+        max_length=6,
+        description=(
+            "One entry per topic that was actually discussed in the transcript "
+            "— never invent a score for a topic with no evidence there. If the "
+            "interview ended early, this list will have fewer than the total "
+            "planned topics; that is expected."
+        ),
     )
     overall_assessment: str = Field(
         min_length=1,
         description=(
             "A short synthesis (2-4 sentences) of the candidate's performance "
-            "across all topics, written after reviewing the per-topic scores."
+            "across the topics actually covered, written after reviewing the "
+            "per-topic scores. If the interview ended before covering every "
+            "planned topic, say so explicitly (e.g. how many of the planned "
+            "topics were reached)."
         ),
     )
     strengths: list[str] = Field(

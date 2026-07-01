@@ -2,7 +2,12 @@ from enum import Enum
 from uuid import uuid4
 
 from app.config import settings
-from app.input_guard import validate_answer, validate_inputs, wrap_untrusted
+from app.input_guard import (
+    InvalidInput,
+    validate_answer,
+    validate_inputs,
+    wrap_untrusted,
+)
 from app.llm import get_llm_client
 from app.prompts import (
     CANDIDATE_ANSWER_TAG,
@@ -210,6 +215,9 @@ def _build_judge_messages(session: Session) -> list[dict]:
 
 def finish_interview(session_id: str) -> Scorecard:
     session = session_store.get(session_id)
+
+    if not any(m.role == MessageRole.user for m in session.transcript):
+        raise InvalidInput("Answer at least one question before ending the interview.")
 
     return (
         get_llm_client()

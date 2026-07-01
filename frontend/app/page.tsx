@@ -146,6 +146,20 @@ export default function Home() {
 
   async function handleEndInterview() {
     if (!sessionId || done || isFinishing) return;
+
+    const hasAnswered = transcript.some((t) => t.role === "candidate");
+    if (!hasAnswered) {
+      if (
+        !window.confirm(
+          "You haven't answered any questions yet, so there's no feedback to generate. End the interview and return to the setup page?",
+        )
+      ) {
+        return;
+      }
+      restart();
+      return;
+    }
+
     if (!window.confirm("End the interview now and see your feedback report?")) {
       return;
     }

@@ -89,9 +89,14 @@ def test_scorecard_with_six_topic_scores_is_valid():
     assert len(make_scorecard(n_topics=6).topic_scores) == 6
 
 
-def test_too_few_topic_scores_rejected():
+def test_scorecard_with_one_topic_score_is_valid():
+    # an early-ended interview may only have covered one topic
+    assert len(make_scorecard(n_topics=1).topic_scores) == 1
+
+
+def test_scorecard_with_no_topic_scores_rejected():
     with pytest.raises(ValidationError):
-        make_scorecard(n_topics=4)
+        make_scorecard(n_topics=0)
 
 
 def test_too_many_topic_scores_rejected():

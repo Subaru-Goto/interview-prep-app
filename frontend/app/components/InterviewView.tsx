@@ -66,7 +66,17 @@ export function InterviewView({
         <Header
           right={
             <button
-              onClick={onRestart}
+              onClick={() => {
+                if (
+                  !done &&
+                  !window.confirm(
+                    "Start over? Your current interview will be discarded and no feedback will be generated. To get a feedback report instead, use “End interview”.",
+                  )
+                ) {
+                  return;
+                }
+                onRestart();
+              }}
               className="rounded-md border border-line-strong px-2.5 py-1 text-xs text-muted transition-colors hover:text-ink"
             >
               {done ? "New interview" : "Start over"}

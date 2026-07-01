@@ -110,6 +110,8 @@ def submit_reply(request: ReplyRequest):
 def finish_and_feedback(request: FinishRequest):
     try:
         scorecard = finish_interview(request.session_id)
+    except InvalidInput as e:
+        raise HTTPException(400, str(e)) from e
     except SessionNotFound as e:
         raise HTTPException(404, str(e)) from e
     except Exception as e:

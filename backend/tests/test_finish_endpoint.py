@@ -10,8 +10,9 @@ def _start_session(valid_cv, valid_jd):
     return response.json()["session_id"]
 
 
-def test_finish_returns_scorecard(valid_cv, valid_jd):
+def test_finish_returns_scorecard_after_a_reply(valid_cv, valid_jd):
     session_id = _start_session(valid_cv, valid_jd)
+    client.post("/reply", json={"session_id": session_id, "answer": "an answer"})
 
     response = client.post("/finish", json={"session_id": session_id})
 
@@ -24,13 +25,12 @@ def test_finish_returns_scorecard(valid_cv, valid_jd):
     assert body["focus_recommendation"]
 
 
-def test_finish_works_after_a_reply(valid_cv, valid_jd):
+def test_finish_with_no_answers_returns_400(valid_cv, valid_jd):
     session_id = _start_session(valid_cv, valid_jd)
-    client.post("/reply", json={"session_id": session_id, "answer": "an answer"})
 
     response = client.post("/finish", json={"session_id": session_id})
 
-    assert response.status_code == 200
+    assert response.status_code == 400
 
 
 def test_finish_unknown_session_returns_404():
