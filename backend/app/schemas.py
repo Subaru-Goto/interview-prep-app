@@ -131,3 +131,52 @@ class InterviewerTurn(BaseModel):
         min_length=1,
         description="The single next question or follow-up to ask the candidate.",
     )
+
+class TopicScore(BaseModel):
+    topic_title: str = Field(min_length=1, description="The title of the scored topic.")
+    topic_score: int = Field(
+        ge=1,
+        le=5,
+        description=(
+            "1 to 5 likert scale: 1 - very weak, unable to answer or "
+            "answer is off-topic; 3 - adequate, meets the bar with some "
+            "gaps; 5 - very strong, thorough and well-reasoned answers."
+        ),
+    )
+    feedback: str = Field(
+        min_length=1,
+        description=(
+            "Simple and direct max 1-2 sentences about the candidate's "
+            "performance on this topic."
+        ),
+    )
+
+
+class Scorecard(BaseModel):
+    topic_scores: list[TopicScore] = Field(
+        min_length=5, max_length=6, description="Ordered list of topic scores."
+    )
+    overall_assessment: str = Field(
+        min_length=1,
+        description=(
+            "A short synthesis (2-4 sentences) of the candidate's performance "
+            "across all topics, written after reviewing the per-topic scores."
+        ),
+    )
+    strengths: list[str] = Field(
+        min_length=2,
+        max_length=4,
+        description="2-4 concrete strengths observed during the interview.",
+    )
+    gaps: list[str] = Field(
+        min_length=2,
+        max_length=4,
+        description="2-4 concrete gaps or areas of concern from the interview.",
+    )
+    focus_recommendation: str = Field(
+        min_length=1,
+        description=(
+            "2-4 sentences of coaching guidance: what the candidate should "
+            "practice or focus on next, prioritized by the gaps above."
+        ),
+    )

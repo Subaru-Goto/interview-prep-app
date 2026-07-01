@@ -8,8 +8,9 @@ from pypdf.errors import PdfReadError
 from app.config import settings
 from app.cv_parser import parse_cv
 from app.input_guard import InvalidInput
-from app.interview_engine import reply, start_interview
+from app.interview_engine import finish_interview, reply, start_interview
 from app.llm import get_llm_client
+from app.schemas import Scorecard
 from app.session_store import SessionNotFound
 
 logger = logging.getLogger(__name__)
@@ -17,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 class ChatRequest(BaseModel):
     message: str
-
 
 class ChatResponse(BaseModel):
     content: str | None
@@ -30,6 +30,9 @@ class StartRequest(BaseModel):
 class StartResponse(BaseModel):
     session_id: str
     first_question: str
+
+class FinishRequest(BaseModel):
+    session_id: str
 
 app = FastAPI()
 
@@ -102,3 +105,14 @@ def submit_reply(request: ReplyRequest):
     except SessionNotFound as e:
         raise HTTPException(404, str(e)) from e
     return {"done": done, "next_question": question}
+
+@app.post("/finish", response_model=Scorecard)
+def finish_and_feedback(request: FinishRequest):
+    try:
+        scorecard = finish_interview(request.session_id)
+    except SessionNotFound as e:
+        raise HTTPException(404, str(e)) from e
+    except Exception as e:
+        logger.error("Judge request failed", exc_info=True)
+        raise HTTPException(502, "Judge failed to produce a valid scorecard") from e
+    return scorecard
