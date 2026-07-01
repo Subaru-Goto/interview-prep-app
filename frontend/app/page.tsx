@@ -3,6 +3,7 @@ import { useState } from "react";
 
 import { InterviewView, type Turn } from "./components/InterviewView";
 import type { Scorecard } from "./components/ScorecardView";
+import type { SessionCost } from "./components/SessionCostFooter";
 import { SetupView } from "./components/SetupView";
 
 // UX hints only — backend's validators are the source of truth.
@@ -28,6 +29,7 @@ export default function Home() {
   const [scorecard, setScorecard] = useState<Scorecard | null>(null);
   const [isFinishing, setIsFinishing] = useState(false);
   const [finishError, setFinishError] = useState("");
+  const [sessionCost, setSessionCost] = useState<SessionCost | null>(null);
 
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -71,6 +73,7 @@ export default function Home() {
       const data = await res.json();
       setSessionId(data.session_id);
       setTranscript([{ role: "interviewer", text: data.first_question }]);
+      setSessionCost(data.session_cost);
     } catch (error) {
       console.error("Error starting interview:", error);
       setStartError("✗ An error occurred while starting the interview.");
@@ -101,6 +104,7 @@ export default function Home() {
         return;
       }
       const data = await res.json();
+      setSessionCost(data.session_cost);
       if (data.done) {
         setDone(true);
         await finishInterview();
@@ -135,7 +139,8 @@ export default function Home() {
         return;
       }
       const data = await res.json();
-      setScorecard(data);
+      setScorecard(data.scorecard);
+      setSessionCost(data.session_cost);
     } catch (error) {
       console.error("Error finishing interview:", error);
       setFinishError("✗ A network error occurred — please try again.");
@@ -178,6 +183,7 @@ export default function Home() {
     setScorecard(null);
     setIsFinishing(false);
     setFinishError("");
+    setSessionCost(null);
   }
 
   const jdLen = jobDescription.trim().length;
@@ -209,6 +215,7 @@ export default function Home() {
           scorecard={scorecard}
           isFinishing={isFinishing}
           finishError={finishError}
+          sessionCost={sessionCost}
         />
       ) : (
         <SetupView

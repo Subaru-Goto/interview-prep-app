@@ -3,12 +3,15 @@ import pytest
 from app.config import settings
 from app.input_guard import InvalidInput
 from app.interview_engine import (
+    _accumulate_usage,
     _build_interviewer_messages,
     _build_judge_messages,
     finish_interview,
+    get_session_cost,
     reply,
     start_interview,
 )
+from app.llm import Usage
 from app.prompts import JUDGE_ANTI_INJECTION_GUARD, STAY_ON_TASK_GUARD
 from app.schemas import MessageRole, Scorecard, Session
 from app.session_store import SessionNotFound, session_store
@@ -141,6 +144,32 @@ def test_finish_interview_with_no_answers_raises(valid_cv, valid_jd):
     session_id, _ = start_interview(valid_cv, valid_jd)
     with pytest.raises(InvalidInput):
         finish_interview(session_id)
+
+
+def test_accumulate_usage_updates_session_totals(valid_cv, valid_jd):
+    session_id, _ = start_interview(valid_cv, valid_jd)
+    session = session_store.get(session_id)
+    before_prompt = session.total_prompt_tokens
+
+    _accumulate_usage(session, Usage(prompt_tokens=100, completion_tokens=50))
+
+    assert session.total_prompt_tokens == before_prompt + 100
+    assert session.total_completion_tokens == 50
+
+
+def test_get_session_cost_reflects_accumulated_usage(valid_cv, valid_jd):
+    session_id, _ = start_interview(valid_cv, valid_jd)
+    session = session_store.get(session_id)
+    _accumulate_usage(session, Usage(prompt_tokens=100, completion_tokens=50))
+    session_store.save(session)
+
+    cost = get_session_cost(session_id)
+
+    assert cost.prompt_tokens == 100
+    assert cost.completion_tokens == 50
+    assert cost.turns == 1  # only the opening question so far
+    assert cost.is_stub is True
+    assert cost.cost_usd == 0.0  # stub pricing is zero regardless of token count
 
 
 def test_judge_messages_only_show_covered_topics(valid_cv, valid_jd):

@@ -8,8 +8,13 @@ from pypdf.errors import PdfReadError
 from app.config import settings
 from app.cv_parser import parse_cv
 from app.input_guard import InvalidInput
-from app.interview_engine import finish_interview, reply, start_interview
-from app.schemas import Scorecard
+from app.interview_engine import (
+    finish_interview,
+    get_session_cost,
+    reply,
+    start_interview,
+)
+from app.schemas import Scorecard, SessionCost
 from app.session_store import SessionNotFound
 
 logger = logging.getLogger(__name__)
@@ -22,9 +27,14 @@ class StartRequest(BaseModel):
 class StartResponse(BaseModel):
     session_id: str
     first_question: str
+    session_cost: SessionCost
 
 class FinishRequest(BaseModel):
     session_id: str
+
+class FinishResponse(BaseModel):
+    scorecard: Scorecard
+    session_cost: SessionCost
 
 app = FastAPI()
 
@@ -64,7 +74,11 @@ def start(request: StartRequest):
     except Exception as e:
         logger.error("Start request failed", exc_info=True)
         raise HTTPException(502, "Could not start the interview") from e
-    return {"session_id": session_id, "first_question": question}
+    return {
+        "session_id": session_id,
+        "first_question": question,
+        "session_cost": get_session_cost(session_id),
+    }
 
 
 class ReplyRequest(BaseModel):
@@ -74,6 +88,7 @@ class ReplyRequest(BaseModel):
 class ReplyResponse(BaseModel):
     done: bool
     next_question: str | None
+    session_cost: SessionCost
 
 @app.post("/reply", response_model=ReplyResponse)
 def submit_reply(request: ReplyRequest):
@@ -89,9 +104,13 @@ def submit_reply(request: ReplyRequest):
     except Exception as e:
         logger.error("Reply request failed", exc_info=True)
         raise HTTPException(502, "Could not process your reply") from e
-    return {"done": done, "next_question": question}
+    return {
+        "done": done,
+        "next_question": question,
+        "session_cost": get_session_cost(request.session_id),
+    }
 
-@app.post("/finish", response_model=Scorecard)
+@app.post("/finish", response_model=FinishResponse)
 def finish_and_feedback(request: FinishRequest):
     try:
         scorecard = finish_interview(request.session_id)
@@ -105,4 +124,7 @@ def finish_and_feedback(request: FinishRequest):
     except Exception as e:
         logger.error("Judge request failed", exc_info=True)
         raise HTTPException(502, "Judge failed to produce a valid scorecard") from e
-    return scorecard
+    return {
+        "scorecard": scorecard,
+        "session_cost": get_session_cost(request.session_id),
+    }

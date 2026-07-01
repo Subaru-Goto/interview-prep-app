@@ -82,7 +82,7 @@ Voice is out of scope for this MVP — all interaction is text. The **interview 
 - **Bonus experiment:** attempt to jailbreak the app (CV injection, rubric extraction, free-chatbot abuse), log attempts + outcomes + which guard caught them in a spreadsheet.
 
 ### Cost (medium bonus)
-- Capture `usage` (prompt/completion tokens) on every call; fetch per-model pricing from OpenRouter's `/models` endpoint; accumulate a per-session total via a pure cost-calculator module. Input caps are the preventive layer.
+- Capture `usage` (prompt/completion tokens **and cost**) on every call and accumulate a per-session total. OpenRouter now always includes the actual billed USD amount inline on the `usage` object of every chat completion response (`usage.cost`, no request flag needed — the old `usage: {include: true}` parameter is deprecated/no-op) — we take that as the authoritative figure rather than computing our own estimate from `/models` list pricing. This is more accurate (it reflects prompt-caching discounts and whatever OpenRouter actually charges) and avoids a real ambiguity a self-computed estimate has: a genuinely free model and a failed pricing lookup both collapse to the same $0.00, silently hiding the difference. Input caps are the preventive layer against runaway spend.
 - **Cost is operator data, kept out of the candidate flow.** The backend always computes/logs/returns it; the UI surfaces it only as a **muted footer on the results page** (after the interview ends, so no immersion cost). Richer/live detail is gated behind a generic `DEV_MODE` env flag (off by default) — the same flag that would later reveal an optional dev panel (model picker, temperature sliders, prompt-variant selector).
 
 ### Configuration & cost-control during development
@@ -93,7 +93,7 @@ Voice is out of scope for this MVP — all interaction is text. The **interview 
 - **Phase 0** skeleton + config + stub LLM (no spend) → **Phase 1** one real OpenRouter call + usage capture → **Phase 2** agent state machine against the stub → **Phase 3** real prompts + structured output + security guard (mandatory complete) → **Phase 4** frontend polish + cost meter → **Phase 5** bake-off + temperature demo + jailbreak log + README → **Phase 6** stretch.
 
 ### Bonus tally (already met; not chasing more)
-- Hard: multi-turn chatbot agent; runtime LLM-as-judge. Medium: JD-as-context (RAG-lite), structured JSON, cost calculation. Exceeds "2 medium + 1 hard."
+- Hard: multi-turn chatbot agent; runtime LLM-as-judge. Medium: JD-as-context (RAG-lite), structured JSON, per-session cost accounting. Exceeds "2 medium + 1 hard."
 
 ## Testing Decisions
 
@@ -101,7 +101,7 @@ Voice is out of scope for this MVP — all interaction is text. The **interview 
 
 **Modules to unit-test (the pure, deep ones — recommended for tests):**
 - **CV parser** — given representative PDF bytes, returns expected text; flags empty/garbage extraction. (Use small fixture PDFs.)
-- **Cost calculator** — given a usage record + pricing, returns the correct cost; handles zero/edge values.
+- **Cost accounting** — no calculator to unit-test (cost is pass-through, not computed — see Cost decision above); instead, `OpenRouterLLMClient` is tested in isolation (mocked SDK response) to confirm it correctly reads `usage.cost` off the response and defaults to `0.0` if a response ever omits it, and the interview engine is tested to confirm per-call cost accumulates correctly into the session total.
 - **Input guard** — enforces caps and PDF-type checks; `wrap_untrusted` produces correctly delimited output; rejects oversized/empty input.
 - **Schemas (Pydantic)** — accept valid plan/scorecard/classification objects, reject malformed or out-of-range ones (this is also the output guard).
 - **Prompt registry** — returns the requested variant and assembles a well-formed `messages` array (system + delimited data + transcript).

@@ -9,6 +9,20 @@ def test_reply_returns_next_question(client, started_session_id):
     assert body["next_question"]
 
 
+def test_reply_session_cost_tracks_turns(client, started_session_id):
+    before = client.post(
+        "/reply", json={"session_id": started_session_id, "answer": "an answer"}
+    ).json()["session_cost"]
+
+    after = client.post(
+        "/reply", json={"session_id": started_session_id, "answer": "another answer"}
+    ).json()["session_cost"]
+
+    assert after["turns"] == before["turns"] + 1
+    assert before["is_stub"] is True and after["is_stub"] is True
+    assert after["cost_usd"] == 0.0  # stub mode: placeholder zero, not omitted
+
+
 def test_reply_rejects_empty_answer(client):
     response = client.post("/reply", json={"session_id": "irrelevant", "answer": "  "})
     assert response.status_code == 400
