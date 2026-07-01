@@ -7,6 +7,8 @@ from pydantic import BaseModel
 from app.config import settings
 from app.schemas import (
     Classification,
+    InterviewerAction,
+    InterviewerTurn,
     InterviewPlan,
     InterviewTopic,
     InterviewType,
@@ -21,6 +23,7 @@ class Usage(BaseModel):
 
 class CompletionResult(BaseModel):
     content: str | None = None
+    # Parsed can be Classification, InterviewPlan, InterviewTurn or None
     parsed: BaseModel | None = None
     usage: Usage
 
@@ -65,6 +68,14 @@ class FakeLLMClient(LLMClient):
                     InterviewTopic(title=f"Topic {i}", focus=f"Probe area {i}")
                     for i in range(5)
                 ],
+            )
+            return CompletionResult(parsed=fake, usage=usage)
+
+        if response_schema is InterviewerTurn:
+            fake = InterviewerTurn(
+                reasoning="Fake reasoning for development.",
+                action=InterviewerAction.follow_up,
+                question="[FAKE LLM] Fake question",
             )
             return CompletionResult(parsed=fake, usage=usage)
 

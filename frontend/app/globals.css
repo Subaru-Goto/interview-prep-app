@@ -1,26 +1,57 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #dbdae73e;
+@theme {
+  /* brand */
+  --color-primary: oklch(0.52 0.11 165);
+  --color-primary-soft: oklch(0.66 0.09 165);
+  --color-primary-tint: oklch(0.95 0.035 165);
+  --color-primary-wash: oklch(0.97 0.025 165);
+  /* highlighted question bg */
+  --color-primary-ink: oklch(0.36 0.08 165);
+  /* text on tint */
+
+  /* neutrals */
+  --color-ink: #1b2030;
+  /* headings / strong text */
+  --color-body: #4b5161;
+  /* body copy inside cards */
+  --color-muted: #6b7280;
+  /* secondary text */
+  --color-faint: #9aa0ad;
+  /* labels, hints, placeholders */
+  --color-line: #eceef3;
+  /* dividers */
+  --color-line-strong: #e3e6ee;
+  /* input borders */
+  --color-surface: #ffffff;
+  /* cards */
+  --color-canvas: #f6f7fb;
+  /* page background */
+  --color-bubble: #f3f4f8;
+  /* interviewer bubble bg */
+
+  --color-success: oklch(0.5 0.13 150);
+  --color-success-bg: oklch(0.965 0.03 150);
+  --color-warning: oklch(0.55 0.14 50);
+  --color-warning-bg: oklch(0.97 0.035 50);
+
+  /* type */
+  --font-sans: var(--font-figtree), ui-sans-serif, system-ui, sans-serif;
+  --font-display: var(--font-hanken), var(--font-figtree), sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, monospace;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Reusable surface for every panel — the card look defined once. */
+@utility card {
+  background-color: var(--color-surface);
+  border-radius: 14px;
+  box-shadow:
+    0 1px 2px rgb(20 24 40 / 0.04),
+    0 10px 30px rgb(20 24 40 / 0.07);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
 }

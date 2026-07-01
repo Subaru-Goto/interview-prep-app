@@ -21,4 +21,8 @@ class Settings(BaseSettings):
     min_alpha_ratio: float = 0.5
     min_jd_chars: int = 200
     max_jd_chars: int = 20000
+    max_turns: int = 12
+    max_followups_per_topic: int = 1
+    max_answer_chars: int = 5000
+    
 settings = Settings()
