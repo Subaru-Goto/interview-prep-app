@@ -3,6 +3,7 @@ import { useEffect, useRef } from "react";
 
 import { Header } from "./Header";
 import { ScorecardView, type Scorecard } from "./ScorecardView";
+import { SessionCostFooter, type SessionCost } from "./SessionCostFooter";
 
 export type Turn = {
   role: "interviewer" | "candidate";
@@ -11,6 +12,10 @@ export type Turn = {
 
 /** Soft target used only for the progress bar; the real cap lives server-side. */
 const PROGRESS_TARGET = 12;
+
+// Off by default — richer/live cost detail is a developer-only view, never
+// shown to candidates. See docs/issues/009-per-session-cost-meter.md.
+const DEV_MODE = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
 interface InterviewViewProps {
   transcript: Turn[];
@@ -26,6 +31,7 @@ interface InterviewViewProps {
   scorecard: Scorecard | null;
   isFinishing: boolean;
   finishError: string;
+  sessionCost: SessionCost | null;
 }
 
 export function InterviewView({
@@ -42,6 +48,7 @@ export function InterviewView({
   scorecard,
   isFinishing,
   finishError,
+  sessionCost,
 }: InterviewViewProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -91,6 +98,13 @@ export function InterviewView({
               </span>
               <div className="flex items-center gap-3">
                 <span className="text-faint">Question {questionCount}</span>
+                {DEV_MODE && sessionCost && (
+                  <span className="text-faint">
+                    ~${sessionCost.cost_usd.toFixed(4)} ·{" "}
+                    {sessionCost.prompt_tokens + sessionCost.completion_tokens}{" "}
+                    tok
+                  </span>
+                )}
                 {!done && (
                   <button
                     onClick={onEndInterview}
@@ -139,7 +153,12 @@ export function InterviewView({
             </div>
           )}
 
-          {done && scorecard && <ScorecardView scorecard={scorecard} />}
+          {done && scorecard && (
+            <>
+              <ScorecardView scorecard={scorecard} />
+              {sessionCost && <SessionCostFooter sessionCost={sessionCost} />}
+            </>
+          )}
 
           {done && !scorecard && (
             <div className="rounded-xl border border-line bg-surface px-4 py-3.5 text-center text-[13px] leading-relaxed text-body">

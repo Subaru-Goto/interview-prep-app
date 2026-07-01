@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 from uuid import uuid4
 
@@ -8,7 +9,7 @@ from app.input_guard import (
     validate_inputs,
     wrap_untrusted,
 )
-from app.llm import get_llm_client
+from app.llm import Usage, get_llm_client
 from app.prompts import (
     CANDIDATE_ANSWER_TAG,
     CLASSIFIER_SYSTEM_PROMPT,
@@ -28,8 +29,37 @@ from app.schemas import (
     MessageRole,
     Scorecard,
     Session,
+    SessionCost,
 )
 from app.session_store import session_store
+
+logger = logging.getLogger(__name__)
+
+
+def _accumulate_usage(session: Session, usage: Usage) -> None:
+    session.total_prompt_tokens += usage.prompt_tokens
+    session.total_completion_tokens += usage.completion_tokens
+    session.total_cost_usd += usage.cost
+    logger.info(
+        "session %s: +%d prompt / +%d completion tokens, +$%.6f (running total $%.6f)",
+        session.session_id,
+        usage.prompt_tokens,
+        usage.completion_tokens,
+        usage.cost,
+        session.total_cost_usd,
+    )
+
+
+def get_session_cost(session_id: str) -> SessionCost:
+    session = session_store.get(session_id)
+    turns = sum(1 for m in session.transcript if m.role == MessageRole.assistant)
+    return SessionCost(
+        turns=turns,
+        prompt_tokens=session.total_prompt_tokens,
+        completion_tokens=session.total_completion_tokens,
+        cost_usd=session.total_cost_usd,
+        is_stub=settings.use_fake_llm,
+    )
 
 
 def _messages(system: str, user: str) -> list[dict]:
@@ -46,18 +76,20 @@ def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
     jd = validate_inputs(cv_text, jd_text)
     client = get_llm_client()
 
-    classification = client.complete(
+    classification_result = client.complete(
         _messages(CLASSIFIER_SYSTEM_PROMPT, wrap_untrusted(JD_TAG, jd)),
         temperature=settings.temp_classifier,
         response_schema=Classification,
-    ).parsed
+    )
+    classification = classification_result.parsed
 
     plan_data = f"{wrap_untrusted(JD_TAG, jd)}\n\n{wrap_untrusted(CV_TAG, cv_text)}"
-    plan = client.complete(
+    plan_result = client.complete(
         _messages(INTERVIEW_PLAN_SYSTEM_PROMPT, plan_data),
         temperature=settings.temp_planner,
         response_schema=InterviewPlan,
-    ).parsed
+    )
+    plan = plan_result.parsed
 
     first_topic = plan.topics[0]
     # implement the classified roles and
@@ -67,11 +99,12 @@ def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
     )
 
     topic_context = f"Topic: {first_topic.title}\nFocus: {first_topic.focus}"
-    first_question = client.complete(
+    question_result = client.complete(
         _messages(interviewer_system, topic_context),
         temperature=settings.temp_interviewer,
         response_schema=None,
-    ).content
+    )
+    first_question = question_result.content
 
     session = Session(
         session_id=str(uuid4()),
@@ -79,6 +112,8 @@ def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
         interview_plan=plan,
         transcript=[Message(role=MessageRole.assistant, content=first_question)],
     )
+    for result in (classification_result, plan_result, question_result):
+        _accumulate_usage(session, result.usage)
     session_store.save(session)
 
     return session.session_id, first_question
@@ -152,15 +187,13 @@ def reply(session_id: str, answer: str) -> tuple[bool, str | None]:
 
     session.transcript.append(Message(role=MessageRole.user, content=cleaned_answer))
 
-    turn = (
-        get_llm_client()
-        .complete(
-            _build_interviewer_messages(session),
-            temperature=settings.temp_interviewer,
-            response_schema=InterviewerTurn,
-        )
-        .parsed
+    turn_result = get_llm_client().complete(
+        _build_interviewer_messages(session),
+        temperature=settings.temp_interviewer,
+        response_schema=InterviewerTurn,
     )
+    turn = turn_result.parsed
+    _accumulate_usage(session, turn_result.usage)
 
     questions_asked = sum(
         1 for m in session.transcript if m.role == MessageRole.assistant
@@ -222,12 +255,12 @@ def finish_interview(session_id: str) -> Scorecard:
     if not any(m.role == MessageRole.user for m in session.transcript):
         raise InvalidInput("Answer at least one question before ending the interview.")
 
-    return (
-        get_llm_client()
-        .complete(
-            _build_judge_messages(session),
-            temperature=settings.temp_judge,
-            response_schema=Scorecard,
-        )
-        .parsed
+    judge_result = get_llm_client().complete(
+        _build_judge_messages(session),
+        temperature=settings.temp_judge,
+        response_schema=Scorecard,
     )
+    _accumulate_usage(session, judge_result.usage)
+    session_store.save(session)
+
+    return judge_result.parsed

@@ -21,6 +21,7 @@ from app.schemas import (
 class Usage(BaseModel):
     prompt_tokens: int = 0
     completion_tokens: int = 0
+    cost: float = 0.0
 
 
 class CompletionResult(BaseModel):
@@ -133,6 +134,7 @@ class OpenRouterLLMClient(LLMClient):
         usage = Usage(
             prompt_tokens=response.usage.prompt_tokens,
             completion_tokens=response.usage.completion_tokens,
+            cost=getattr(response.usage, "cost", None) or 0.0,
         )
         message = response.choices[0].message
 

@@ -102,6 +102,35 @@ class Session(BaseModel):
         default=0,
         description="Number of follow-up questions asked during the interview.",
     )
+    total_prompt_tokens: int = Field(
+        default=0, description="Prompt tokens used across every LLM call so far."
+    )
+    total_completion_tokens: int = Field(
+        default=0, description="Completion tokens used across every LLM call so far."
+    )
+    total_cost_usd: float = Field(
+        default=0.0, description="Accumulated USD cost across every LLM call so far."
+    )
+
+
+class SessionCost(BaseModel):
+    """Operator-facing cost summary for a session, returned on every call."""
+
+    turns: int = Field(
+        ge=0, description="Number of interviewer questions asked so far."
+    )
+    prompt_tokens: int = Field(ge=0, description="Total prompt tokens used so far.")
+    completion_tokens: int = Field(
+        ge=0, description="Total completion tokens used so far."
+    )
+    cost_usd: float = Field(ge=0.0, description="Accumulated cost in USD so far.")
+    is_stub: bool = Field(
+        description=(
+            "True when running against the fake LLM, so cost_usd is a "
+            "placeholder zero rather than a real charge."
+        )
+    )
+
 
 class InterviewerAction(str, Enum):
     """Interviewer's next action"""
