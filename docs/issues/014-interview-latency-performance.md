@@ -18,7 +18,7 @@ Root causes (observed during 006 real-model smoke testing):
 
 ## Acceptance criteria
 
-- [ ] `/start` runs the classifier and planner calls **concurrently** (independent calls), with the first-question call after both; measured start latency is meaningfully lower than the sequential version.
+- [x] `/start` runs the classifier and planner calls **concurrently** (independent calls), with the first-question call after both; measured start latency is meaningfully lower than the sequential version. (Done via `perf/parallel-interview-setup`, merged in PR #13 — `ThreadPoolExecutor` around the two sync client calls, per the "keep it simple" note below.)
 - [ ] Interviewer questions are concise — a single focused question, not multi-part walls — reducing output tokens per turn (coordinate with `010-prompt-bakeoff-writeup.md`; the winning prompt should enforce this).
 - [ ] No behavioural regressions: the `resolve_transition` rules, turn cap, follow-up limit, and hidden-state guarantees are unchanged (existing tests still pass).
 - [ ] (Stretch) Stream the interviewer's response so it appears progressively for better perceived latency. Note: the reply turn uses structured output (`InterviewerTurn`), which complicates token streaming — evaluate streaming only the `question` field, or a separate lightweight text call.
