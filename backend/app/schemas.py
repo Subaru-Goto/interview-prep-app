@@ -146,7 +146,8 @@ class InterviewerTurn(BaseModel):
             "Analyze the candidate's most recent answer before deciding: "
             "was it complete, vague, or notably strong, and is the current "
             "topic sufficiently covered? Think here first, then choose the "
-            "action."
+            "action. Do ALL of your step-by-step thinking in this field — "
+            "none of it belongs in 'question'."
         ),
     )
     action: InterviewerAction = Field(
@@ -158,7 +159,17 @@ class InterviewerTurn(BaseModel):
     )
     question: str = Field(
         min_length=1,
-        description="The single next question or follow-up to ask the candidate.",
+        description=(
+            "Exactly one interview question: a single sentence ending in "
+            "exactly one question mark, asking about exactly one thing. "
+            "No numbered or bulleted lists. Watch specifically for the word "
+            "'and': 'How did you do X and Y?' is TWO questions disguised as "
+            "one sentence, not one question — this is the single most common "
+            "mistake, avoid it above all else. Same for 'also' and "
+            "'additionally'. If your draft question connects two different "
+            "things with one of those words, delete everything after the "
+            "connector and keep only the single most important thing."
+        ),
     )
 
 class TopicScore(BaseModel):
