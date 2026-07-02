@@ -9,7 +9,6 @@ class PromptTechnique(str, Enum):
     "This is to select a type of prompt engineering technique"
     zero_shot="zero_shot"
     few_shot="few_shot"
-    chain_of_thought="chain_of_thought"
     role_play="role_play"
 
 
