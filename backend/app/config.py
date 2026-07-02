@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
 
 class Model(str, Enum):
-    GEMMA_4 = "google/gemma-4-26b-a4b-it:free"
-    GPT_5 = "openai/gpt-5-nano"
+    GPT_5_4_nano = "openai/gpt-5.4-nano"
+    GPT_5_nano = "openai/gpt-5-nano"
 
 class PromptTechnique(str, Enum):
     "This is to select a type of prompt engineering technique"
@@ -15,8 +15,8 @@ class PromptTechnique(str, Enum):
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
-    use_fake_llm: bool = True
-    model: Model = Model.GEMMA_4
+    use_fake_llm: bool = False
+    model: Model = Model.GPT_5_nano
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     temp_classifier: float = 0.1
@@ -36,6 +36,6 @@ class Settings(BaseSettings):
     max_turns: int = 12
     max_followups_per_topic: int = 1
     max_answer_chars: int = 5000
-    prompt_technique:PromptTechnique=PromptTechnique.zero_shot
+    prompt_technique:PromptTechnique=PromptTechnique.few_shot
     
 settings = Settings()
