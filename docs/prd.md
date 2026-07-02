@@ -59,7 +59,7 @@ Voice is out of scope for this MVP — all interaction is text. The **interview 
 
 ### Architecture
 - **Frontend:** Next.js with **React 19** and **Tailwind CSS** (single-page candidate experience: CV upload, JD paste, chat view, feedback report).
-- **Backend:** FastAPI exposing the interview lifecycle as endpoints (start / reply / finish). Stateful server with session state held in an **in-memory store behind a small `get`/`save` interface**, so a later swap to SQLite is a localized change. Sessions get a TTL/cap to avoid unbounded memory growth. **Single-worker assumption** for the in-memory store (documented limitation).
+- **Backend:** FastAPI exposing the interview lifecycle as endpoints (start / reply / finish). Stateful server with session state held in an **in-memory store behind a small `get`/`save` interface**. Sessions get a TTL/cap to avoid unbounded memory growth. **Single-worker assumption** for the in-memory store (documented limitation).
 - **LLM access:** plain OpenRouter calls via the **OpenAI Python SDK** (`base_url` pointed at OpenRouter). No LangChain in this MVP (deferred to a later course chapter).
 - **Hidden state:** the interview plan and scoring rubric live only server-side and are never sent to the browser.
 
@@ -71,7 +71,7 @@ Voice is out of scope for this MVP — all interaction is text. The **interview 
 - **Temperature is the headline tuned parameter, set per role** (consistency for classifier/judge, variety for interviewer). top-p / frequency penalty discussed in the writeup but not cranked.
 
 ### Prompt engineering (mandatory requirement)
-- Five **interviewer** system-prompt variants — zero-shot, few-shot, chain-of-thought, role-play persona, structured-rubric — held in a **prompt registry**. A controlled bake-off across 2–3 fixed `(CV, JD)` fixtures selects the winner; each technique is written up for submission. Planner (CoT) and judge (structured) demonstrate additional techniques naturally.
+- Four **interviewer** system-prompt variants — zero-shot, few-shot, chain-of-thought, role-play persona — held in a **prompt registry**. (Originally scoped as five, including a structured-rubric variant; dropped deliberately — see `docs/issues/010-prompt-bakeoff-writeup.md` for why.) A controlled bake-off across 2–3 fixed `(CV, JD)` fixtures selects the winner; each technique is written up for submission. Planner (CoT) and judge (structured) demonstrate additional techniques naturally.
 
 ### Structured output (medium bonus)
 - Model calls that must return data use `response_format` JSON-schema mode, validated with **Pydantic** models. Two graded formats: **interview plan** and **final scorecard** (classifier output also structured). Per-model structured-output support to be confirmed on OpenRouter; default model curated to a supporting one.
@@ -117,7 +117,7 @@ Voice is out of scope for this MVP — all interaction is text. The **interview 
 
 - Voice (text-to-speech / speech-to-text) — written interaction only this MVP.
 - Authentication / user accounts / multi-user concurrency (single-worker, in-memory sessions).
-- Durable persistence (SQLite/DB) and history of past interviews — deferred stretch.
+- Durable persistence and history of past interviews — deferred stretch.
 - `.docx`/image CVs and OCR of scanned PDFs — PDF text extraction only. **CV is PDF-only: there is no copy-paste fallback.** An unreadable/textless PDF is rejected and the candidate uploads a different one. (A **vision/OCR fallback** for unreadable PDFs — escalating to a multimodal LLM when text extraction fails — is captured as a deferred enhancement in `docs/issues/013-stretch-vision-cv-fallback.md`.)
 - Showing or editing the extracted CV text — the parse is used as-is; the candidate sees only upload success/failure, never the contents.
 - Interview formats beyond the two text-deliverable types — **practical / demonstration** (portfolio critique, work sample, teaching demo) and **interpersonal / role-play** (mock sales call, negotiation) — are out of scope for the MVP: the text-only screening product has no artifact/work-sample channel, and role-play is a later-round format. The architecture supports adding types later.
