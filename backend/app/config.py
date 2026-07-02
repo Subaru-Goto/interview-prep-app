@@ -35,6 +35,6 @@ class Settings(BaseSettings):
     max_turns: int = 12
     max_followups_per_topic: int = 1
     max_answer_chars: int = 5000
-    prompt_technique:PromptTechnique=PromptTechnique.few_shot
+    prompt_technique:PromptTechnique=PromptTechnique.zero_shot
     
 settings = Settings()

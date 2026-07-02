@@ -85,12 +85,11 @@ topic or move on to the next, then ask a single, clear question.
 Keep it conversational and answerable in a few minutes.
 
 # Examples of good, single-focused questions:
-- "Can you walk me through how you diagnosed and fixed the slow checkout
-  query you mentioned on your CV?"
+- "Can you walk me through how you resolved the slow checkout query you
+  mentioned on your CV?"
 - "You mentioned leading a team of 4 engineers on that migration — what was
   the hardest part of getting them aligned?"
-- "What's the difference between mean and median, and when would you reach
-  for one over the other?"
+- "When would you choose to report the median instead of the mean?"
 
 # Avoid this — a real overloaded question this task has produced before,
 # do NOT do this:
