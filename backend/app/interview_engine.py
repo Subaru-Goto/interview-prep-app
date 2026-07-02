@@ -16,9 +16,9 @@ from app.prompts import (
     CV_TAG,
     INTERVIEW_PLAN_SYSTEM_PROMPT,
     INTERVIEWER_SYSTEM_PROMPT,
-    INTERVIEWER_TURN_SYSTEM_PROMPT,
     JD_TAG,
     JUDGE_SYSTEM_PROMPT,
+    INTERVIEWER_PROMPT_REGISTRY
 )
 from app.schemas import (
     Classification,
@@ -155,7 +155,7 @@ def _build_interviewer_messages(session: Session) -> list[dict]:
     follow_up_allowed = session.followups_asked < settings.max_followups_per_topic
     has_next = session.current_topic_index + 1 < len(topics)
 
-    system = INTERVIEWER_TURN_SYSTEM_PROMPT.format(
+    system = INTERVIEWER_PROMPT_REGISTRY[settings.prompt_technique].format(
         interview_type=session.classification.interview_type.value,
         seniority=session.classification.seniority.value,
     )

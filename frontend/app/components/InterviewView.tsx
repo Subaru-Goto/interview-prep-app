@@ -10,11 +10,9 @@ export type Turn = {
   text: string;
 };
 
-/** Soft target used only for the progress bar; the real cap lives server-side. */
+/* Used for progress bar */
 const PROGRESS_TARGET = 12;
 
-// Off by default — richer/live cost detail is a developer-only view, never
-// shown to candidates. See docs/issues/009-per-session-cost-meter.md.
 const DEV_MODE = process.env.NEXT_PUBLIC_DEV_MODE === "true";
 
 interface InterviewViewProps {
@@ -126,7 +124,7 @@ export function InterviewView({
         </div>
       </div>
 
-      {/* Transcript — fills the viewport, readable column centered */}
+      {/* Transcript */}
       <div className="flex-1 overflow-y-auto bg-canvas">
         <div className="w-full space-y-3.5 px-4 py-6 sm:px-6">
           {transcript.map((turn, i) =>
