@@ -1,5 +1,7 @@
-from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
 
 class Model(str, Enum):
     GPT_5_4_nano = "openai/gpt-5.4-nano"
@@ -36,5 +38,7 @@ class Settings(BaseSettings):
     max_followups_per_topic: int = 1
     max_answer_chars: int = 5000
     prompt_technique:PromptTechnique=PromptTechnique.zero_shot
-    
+    session_ttl_seconds: int = 3600  # 1h of inactivity
+    max_sessions: int = 500
+
 settings = Settings()

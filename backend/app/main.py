@@ -15,7 +15,7 @@ from app.interview_engine import (
     start_interview,
 )
 from app.schemas import Scorecard, SessionCost
-from app.session_store import SessionNotFound
+from app.session_store import SessionNotFound, session_store
 
 logger = logging.getLogger(__name__)
 
@@ -114,6 +114,9 @@ def submit_reply(request: ReplyRequest):
 def finish_and_feedback(request: FinishRequest):
     try:
         scorecard = finish_interview(request.session_id)
+        cost = get_session_cost(request.session_id)
+        # Read session info before clearing
+        session_store.delete(request.session_id)
     except InvalidInput as e:
         raise HTTPException(400, str(e)) from e
     except SessionNotFound as e:
@@ -126,5 +129,5 @@ def finish_and_feedback(request: FinishRequest):
         raise HTTPException(502, "Judge failed to produce a valid scorecard") from e
     return {
         "scorecard": scorecard,
-        "session_cost": get_session_cost(request.session_id),
+        "session_cost": cost,
     }
