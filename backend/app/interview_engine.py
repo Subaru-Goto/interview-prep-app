@@ -155,7 +155,7 @@ def _build_interviewer_messages(session: Session) -> list[dict]:
     follow_up_allowed = session.followups_asked < settings.max_followups_per_topic
     has_next = session.current_topic_index + 1 < len(topics)
 
-    system = INTERVIEWER_PROMPT_REGISTRY[settings.prompt_technique](
+    system = INTERVIEWER_PROMPT_REGISTRY[settings.prompt_technique].format(
         interview_type=session.classification.interview_type.value,
         seniority=session.classification.seniority.value,
     )
