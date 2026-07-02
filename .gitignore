@@ -7,7 +7,7 @@
 .venv
 __pycache__
 .ruff_cache
-.deepeval/
+.deepeval
 
 #frontend
 node_modules
