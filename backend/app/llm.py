@@ -4,7 +4,7 @@ from functools import lru_cache
 from openai import OpenAI
 from pydantic import BaseModel
 
-from app.config import settings
+from app.config import ReasoningEffort, settings
 from app.schemas import (
     Classification,
     InterviewerAction,
@@ -36,17 +36,24 @@ class LLMClient(ABC):
     def complete(
         self,
         messages: list[dict],
-        temperature: float = 0.7,
+        reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
         response_schema: type[BaseModel] | None = None,
-    ) -> CompletionResult: ...
+        seed: int | None = None,
+    ) -> CompletionResult:
+        """Run one chat completion. If response_schema is given, parse the
+        reply into that Pydantic model (CompletionResult.parsed); otherwise
+        return raw text (CompletionResult.content). seed is best-effort
+        reproducibility, not a determinism guarantee."""
+        ...
 
 
 class FakeLLMClient(LLMClient):
     def complete(
         self,
         messages: list[dict],
-        temperature: float = 0.7,
+        reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
         response_schema: type[BaseModel] | None = None,
+        seed: int | None = None,
     ) -> CompletionResult:
         usage = Usage()
 
@@ -116,19 +123,28 @@ class OpenRouterLLMClient(LLMClient):
     def complete(
         self,
         messages: list[dict],
-        temperature: float = 0.7,
+        reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
         response_schema: type[BaseModel] | None = None,
+        seed: int | None = None,
     ) -> CompletionResult:
+
+        extra_body = {"reasoning": {"effort": reasoning_effort.value}}
+        optional_kwargs = {"seed": seed} if seed is not None else {}
+
         if response_schema is None:
             response = self.client.chat.completions.create(
-                model=settings.model, messages=messages, temperature=temperature
+                model=settings.model,
+                messages=messages,
+                extra_body=extra_body,
+                **optional_kwargs,
             )
         else:
             response = self.client.chat.completions.parse(
                 model=settings.model,
                 messages=messages,
-                temperature=temperature,
                 response_format=response_schema,
+                extra_body=extra_body,
+                **optional_kwargs,
             )
 
         usage = Usage(
@@ -146,6 +162,9 @@ class OpenRouterLLMClient(LLMClient):
 # Cache the LLM client
 @lru_cache
 def get_llm_client() -> LLMClient:
+    """Return the process-wide LLM client — FakeLLMClient in dev
+    (use_fake_llm=True), otherwise the real OpenRouter client. Cached, so
+    settings.use_fake_llm is only read on first call in a process."""
     if settings.use_fake_llm:
         return FakeLLMClient()
     return OpenRouterLLMClient()

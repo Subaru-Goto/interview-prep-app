@@ -52,6 +52,8 @@ def _accumulate_usage(session: Session, usage: Usage) -> None:
 
 
 def get_session_cost(session_id: str) -> SessionCost:
+    """Return the running token/cost totals for a session. Raises
+    SessionNotFound if session_id doesn't exist (or has expired)."""
     session = session_store.get(session_id)
     turns = sum(1 for m in session.transcript if m.role == MessageRole.assistant)
     return SessionCost(
@@ -85,13 +87,13 @@ def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
         classification_future = executor.submit(
             client.complete,
             _messages(CLASSIFIER_SYSTEM_PROMPT, wrap_untrusted(JD_TAG, jd)),
-            temperature=settings.temp_classifier,
+            reasoning_effort=settings.reasoning_effort_classifier,
             response_schema=Classification,
         )
         plan_future = executor.submit(
             client.complete,
             _messages(INTERVIEW_PLAN_SYSTEM_PROMPT, plan_data),
-            temperature=settings.temp_planner,
+            reasoning_effort=settings.reasoning_effort_planner,
             response_schema=InterviewPlan,
         )
         classification_result = classification_future.result()
@@ -110,7 +112,7 @@ def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
     topic_context = f"Topic: {first_topic.title}\nFocus: {first_topic.focus}"
     question_result = client.complete(
         _messages(interviewer_system, topic_context),
-        temperature=settings.temp_interviewer,
+        reasoning_effort=settings.reasoning_effort_interviewer,
         response_schema=None,
     )
     first_question = question_result.content
@@ -143,6 +145,10 @@ def resolve_transition(
     max_turns: int,
     max_followups: int,
 ) -> Transition:
+    """Decide the next state deterministically from the interviewer's
+    proposed action and the session's bounds — the model proposes, this
+    function enforces. Turn cap and topic list always win over the model's
+    own request to keep following up."""
     if questions_asked >= max_turns:
         return Transition.finish
 
@@ -191,6 +197,10 @@ def _build_interviewer_messages(session: Session) -> list[dict]:
 
 
 def reply(session_id: str, answer: str) -> tuple[bool, str | None]:
+    """Record the candidate's answer, get the interviewer's next turn, and
+    advance the session state. Returns (True, None) once the interview ends,
+    or (False, next_question) otherwise. Raises InvalidInput on an empty/
+    invalid answer, SessionNotFound if session_id doesn't exist."""
     cleaned_answer = validate_answer(answer)
     session = session_store.get(session_id)
 
@@ -198,7 +208,7 @@ def reply(session_id: str, answer: str) -> tuple[bool, str | None]:
 
     turn_result = get_llm_client().complete(
         _build_interviewer_messages(session),
-        temperature=settings.temp_interviewer,
+        reasoning_effort=settings.reasoning_effort_interviewer,
         response_schema=InterviewerTurn,
     )
     turn = turn_result.parsed
@@ -259,6 +269,10 @@ def _build_judge_messages(session: Session) -> list[dict]:
 
 
 def finish_interview(session_id: str) -> Scorecard:
+    """Judge the transcript so far and return a scorecard. Does not delete
+    the session — callers decide when cleanup happens. Raises InvalidInput
+    if no answers were given yet, SessionNotFound if session_id doesn't
+    exist."""
     session = session_store.get(session_id)
 
     if not any(m.role == MessageRole.user for m in session.transcript):
@@ -266,8 +280,9 @@ def finish_interview(session_id: str) -> Scorecard:
 
     judge_result = get_llm_client().complete(
         _build_judge_messages(session),
-        temperature=settings.temp_judge,
+        reasoning_effort=settings.reasoning_effort_judge,
         response_schema=Scorecard,
+        seed=settings.judge_seed,
     )
     _accumulate_usage(session, judge_result.usage)
     session_store.save(session)

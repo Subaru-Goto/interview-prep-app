@@ -177,7 +177,7 @@ def main():
             messages = _build_interviewer_messages(fixture.session)
             turn = client.complete(
                 messages,
-                temperature=settings.temp_interviewer,
+                reasoning_effort=settings.reasoning_effort_interviewer,
                 response_schema=InterviewerTurn,
             ).parsed
 

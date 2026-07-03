@@ -178,9 +178,18 @@ class TopicScore(BaseModel):
         ge=1,
         le=5,
         description=(
-            "1 to 5 likert scale: 1 - very weak, unable to answer or "
-            "answer is off-topic; 3 - adequate, meets the bar with some "
-            "gaps; 5 - very strong, thorough and well-reasoned answers."
+            "1 to 5 likert scale, anchored so each point means the same "
+            "thing across every candidate: "
+            "1 - no relevant content, unable to answer, or entirely off-topic; "
+            "2 - attempted the topic but mostly incorrect, vague, or missing "
+            "key parts; "
+            "3 - correct on the fundamentals but shallow, with noticeable gaps; "
+            "4 - solid and mostly complete, with only minor gaps; "
+            "5 - complete, accurate, and well-reasoned, with no meaningful gaps. "
+            "Score based only on the correctness, depth, and relevance of the "
+            "content — a concise, correct answer should score as well as a "
+            "longer one covering the same ground. Do not let length, "
+            "elaboration, or confident tone raise the score on their own."
         ),
     )
     feedback: str = Field(
