@@ -268,6 +268,7 @@ def finish_interview(session_id: str) -> Scorecard:
         _build_judge_messages(session),
         reasoning_effort=settings.reasoning_effort_judge,
         response_schema=Scorecard,
+        seed=settings.judge_seed,
     )
     _accumulate_usage(session, judge_result.usage)
     session_store.save(session)

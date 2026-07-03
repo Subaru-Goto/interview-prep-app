@@ -160,6 +160,14 @@ self-prep report for the candidate, not a hiring decision. If fewer topics
 were discussed than were planned, say so plainly in the overall assessment
 using the counts you were given.
 
+# Scoring guidance
+Apply the same standard to every topic and every candidate — use the score
+definitions exactly as given, not your own interpretation of them. Judge
+answers on correctness, depth, and relevance only. A short, precise, correct
+answer should score as well as a long one covering the same ground; do not
+give a higher score just because an answer is longer, more elaborate, or
+more confidently worded.
+
 # Tone
 Give feedback in a clear, kind and empathetic way, but don't be afraid to point out
 the issues.

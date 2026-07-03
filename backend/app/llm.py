@@ -38,6 +38,7 @@ class LLMClient(ABC):
         messages: list[dict],
         reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
         response_schema: type[BaseModel] | None = None,
+        seed: int | None = None,
     ) -> CompletionResult: ...
 
 
@@ -47,6 +48,7 @@ class FakeLLMClient(LLMClient):
         messages: list[dict],
         reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
         response_schema: type[BaseModel] | None = None,
+        seed: int | None = None,
     ) -> CompletionResult:
         usage = Usage()
 
@@ -118,14 +120,18 @@ class OpenRouterLLMClient(LLMClient):
         messages: list[dict],
         reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
         response_schema: type[BaseModel] | None = None,
+        seed: int | None = None,
     ) -> CompletionResult:
-        # `reasoning` is an OpenRouter-specific field the OpenAI SDK doesn't
-        # model natively, so it's passed through via extra_body.
+
         extra_body = {"reasoning": {"effort": reasoning_effort.value}}
+        optional_kwargs = {"seed": seed} if seed is not None else {}
 
         if response_schema is None:
             response = self.client.chat.completions.create(
-                model=settings.model, messages=messages, extra_body=extra_body
+                model=settings.model,
+                messages=messages,
+                extra_body=extra_body,
+                **optional_kwargs,
             )
         else:
             response = self.client.chat.completions.parse(
@@ -133,6 +139,7 @@ class OpenRouterLLMClient(LLMClient):
                 messages=messages,
                 response_format=response_schema,
                 extra_body=extra_body,
+                **optional_kwargs,
             )
 
         usage = Usage(

@@ -27,13 +27,11 @@ class Settings(BaseSettings):
     model: Model = Model.GPT_5_nano
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    # GPT-5 family models on OpenRouter ignore `temperature` entirely (not in
-    # their supported_parameters); `reasoning.effort` is the parameter that
-    # actually takes effect for this model family.
     reasoning_effort_classifier: ReasoningEffort = ReasoningEffort.low
     reasoning_effort_planner: ReasoningEffort = ReasoningEffort.medium
     reasoning_effort_interviewer: ReasoningEffort = ReasoningEffort.low
     reasoning_effort_judge: ReasoningEffort = ReasoningEffort.high
+    judge_seed: int = 42
     frontend_origin: str = "http://localhost:3000"
     min_cv_chars: int = 100
     max_cv_chars: int = 50000
