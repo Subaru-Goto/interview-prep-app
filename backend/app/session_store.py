@@ -14,14 +14,19 @@ class SessionNotFound(Exception):
 class SessionStore(ABC):
     @abstractmethod
     def save(self, session: Session) -> None:
+        """Create or overwrite the session under session.session_id, and mark
+        it as just-active (resets TTL/eviction ordering)."""
         pass
 
     @abstractmethod
     def get(self, session_id: str) -> Session:
+        """Return the session and mark it as just-active. Raises
+        SessionNotFound if it doesn't exist or has expired."""
         pass
 
     @abstractmethod
     def delete(self, session_id: str) -> None:
+        """Remove the session if present; a no-op if it's already gone."""
         pass
 
 

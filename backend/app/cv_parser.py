@@ -12,6 +12,9 @@ class CVParseResult(BaseModel):
 
 
 def looks_like_real_text(text: str) -> bool:
+    """Heuristic quality gate for extracted CV text: rejects text that's too
+    short or whose whitespace/alphabetic ratios suggest a garbled or scanned
+    (non-text-layer) PDF rather than real prose."""
     stripped = text.strip()
     if len(stripped) < settings.min_cv_chars:
         return False
@@ -27,6 +30,10 @@ def looks_like_real_text(text: str) -> bool:
 
 
 def parse_cv(data: bytes) -> CVParseResult:
+    """Extract text from a PDF's text layer (truncated to max_cv_chars) and
+    flag whether it looks usable. Does not raise on a garbled/scanned PDF —
+    that's reflected in is_usable, not an exception; a genuinely unreadable
+    PDF raises pypdf's own PdfReadError."""
     reader = PdfReader(BytesIO(data))
     full_text = "\n".join([t for page in reader.pages if (t := page.extract_text())])
     full_text = full_text[: settings.max_cv_chars]

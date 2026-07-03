@@ -48,6 +48,9 @@ app.add_middleware(
 
 @app.post("/upload-cv")
 async def upload_cv(file: UploadFile = File(...)):
+    """Parse an uploaded PDF CV and return its extracted text for preview.
+    400 if the file isn't a PDF, 413 if it exceeds max_cv_bytes, 422 if the
+    PDF can't be parsed."""
     if file.content_type != "application/pdf":
         raise HTTPException(400, "Only PDF files are accepted")
 
@@ -64,6 +67,9 @@ async def upload_cv(file: UploadFile = File(...)):
 
 @app.post("/start", response_model=StartResponse)
 def start(request: StartRequest):
+    """Classify the role, build an interview plan, and return the first
+    question plus a new session_id. 400 on invalid CV/JD input, 500 if the
+    server is misconfigured, 502 on any other LLM/upstream failure."""
     try:
         session_id, question = start_interview(request.cv_text, request.jd_text)
     except InvalidInput as e:
@@ -92,6 +98,10 @@ class ReplyResponse(BaseModel):
 
 @app.post("/reply", response_model=ReplyResponse)
 def submit_reply(request: ReplyRequest):
+    """Submit the candidate's answer and get back the next question, or
+    done=True with next_question=None once the interview ends. 400 on an
+    empty/invalid answer, 404 if session_id is unknown, 500 if the server is
+    misconfigured, 502 on any other LLM/upstream failure."""
     try:
         done, question = reply(request.session_id, request.answer)
     except InvalidInput as e:
@@ -112,6 +122,10 @@ def submit_reply(request: ReplyRequest):
 
 @app.post("/finish", response_model=FinishResponse)
 def finish_and_feedback(request: FinishRequest):
+    """End the interview, return the judge's scorecard and final cost, and
+    delete the session — it cannot be fetched again after this call. 400 if
+    no answers were given yet, 404 if session_id is unknown, 500 if the
+    server is misconfigured, 502 if the judge fails to produce a scorecard."""
     try:
         scorecard = finish_interview(request.session_id)
         cost = get_session_cost(request.session_id)

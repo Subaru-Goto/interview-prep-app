@@ -39,7 +39,12 @@ class LLMClient(ABC):
         reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
         response_schema: type[BaseModel] | None = None,
         seed: int | None = None,
-    ) -> CompletionResult: ...
+    ) -> CompletionResult:
+        """Run one chat completion. If response_schema is given, parse the
+        reply into that Pydantic model (CompletionResult.parsed); otherwise
+        return raw text (CompletionResult.content). seed is best-effort
+        reproducibility, not a determinism guarantee."""
+        ...
 
 
 class FakeLLMClient(LLMClient):
@@ -157,6 +162,9 @@ class OpenRouterLLMClient(LLMClient):
 # Cache the LLM client
 @lru_cache
 def get_llm_client() -> LLMClient:
+    """Return the process-wide LLM client — FakeLLMClient in dev
+    (use_fake_llm=True), otherwise the real OpenRouter client. Cached, so
+    settings.use_fake_llm is only read on first call in a process."""
     if settings.use_fake_llm:
         return FakeLLMClient()
     return OpenRouterLLMClient()
