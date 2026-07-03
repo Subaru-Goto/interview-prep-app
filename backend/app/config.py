@@ -28,11 +28,13 @@ class Settings(BaseSettings):
     model: Model = Model.GPT_5_nano
     openrouter_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    reasoning_effort_classifier: ReasoningEffort = ReasoningEffort.low
-    reasoning_effort_planner: ReasoningEffort = ReasoningEffort.medium
     # gpt-5-nano rejects reasoning.effort="none" outright ("Reasoning is
     # mandatory for this endpoint and cannot be disabled") — minimal is the
-    # lowest level this model actually accepts.
+    # lowest level this model actually accepts. Measured real latency:
+    # classify 2.8s->1.6s, plan 24.2s->3.6s (medium->minimal) with no
+    # observed quality drop in the generated plan's topics.
+    reasoning_effort_classifier: ReasoningEffort = ReasoningEffort.minimal
+    reasoning_effort_planner: ReasoningEffort = ReasoningEffort.minimal
     reasoning_effort_interviewer: ReasoningEffort = ReasoningEffort.minimal
     reasoning_effort_judge: ReasoningEffort = ReasoningEffort.high
     judge_seed: int = 42
