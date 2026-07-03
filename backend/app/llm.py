@@ -4,7 +4,7 @@ from functools import lru_cache
 from openai import OpenAI
 from pydantic import BaseModel
 
-from app.config import settings
+from app.config import ReasoningEffort, settings
 from app.schemas import (
     Classification,
     InterviewerAction,
@@ -36,7 +36,7 @@ class LLMClient(ABC):
     def complete(
         self,
         messages: list[dict],
-        temperature: float = 0.7,
+        reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
         response_schema: type[BaseModel] | None = None,
     ) -> CompletionResult: ...
 
@@ -45,7 +45,7 @@ class FakeLLMClient(LLMClient):
     def complete(
         self,
         messages: list[dict],
-        temperature: float = 0.7,
+        reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
         response_schema: type[BaseModel] | None = None,
     ) -> CompletionResult:
         usage = Usage()
@@ -116,19 +116,23 @@ class OpenRouterLLMClient(LLMClient):
     def complete(
         self,
         messages: list[dict],
-        temperature: float = 0.7,
+        reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
         response_schema: type[BaseModel] | None = None,
     ) -> CompletionResult:
+        # `reasoning` is an OpenRouter-specific field the OpenAI SDK doesn't
+        # model natively, so it's passed through via extra_body.
+        extra_body = {"reasoning": {"effort": reasoning_effort.value}}
+
         if response_schema is None:
             response = self.client.chat.completions.create(
-                model=settings.model, messages=messages, temperature=temperature
+                model=settings.model, messages=messages, extra_body=extra_body
             )
         else:
             response = self.client.chat.completions.parse(
                 model=settings.model,
                 messages=messages,
-                temperature=temperature,
                 response_format=response_schema,
+                extra_body=extra_body,
             )
 
         usage = Usage(
