@@ -1,16 +1,15 @@
-def test_start_returns_session_and_question(client, valid_cv, valid_jd):
+def test_start_returns_session_id(client, valid_cv, valid_jd):
     response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
     assert response.status_code == 200
     body = response.json()
     assert body["session_id"]
-    assert body["first_question"]
 
 
 def test_start_response_hides_plan_and_classification(client, valid_cv, valid_jd):
     response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
     body = response.json()
     # the payload exposes ONLY these fields — hidden state stays server-side
-    assert set(body.keys()) == {"session_id", "first_question", "session_cost"}
+    assert set(body.keys()) == {"session_id", "session_cost"}
     for leaked in ("plan", "interview_plan", "classification", "topics", "reasoning"):
         assert leaked not in body
 
@@ -18,7 +17,8 @@ def test_start_response_hides_plan_and_classification(client, valid_cv, valid_jd
 def test_start_returns_session_cost(client, valid_cv, valid_jd):
     response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
     cost = response.json()["session_cost"]
-    assert cost["turns"] == 1
+    # no opening question generated yet — that's a separate streamed call
+    assert cost["turns"] == 0
     assert cost["is_stub"] is True
     assert cost["cost_usd"] == 0.0
 
@@ -48,3 +48,23 @@ def test_start_returns_500_when_misconfigured(client, monkeypatch, valid_cv, val
     response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
 
     assert response.status_code == 500
+
+
+def test_stream_opening_question_returns_token_and_done_events(
+    client, valid_cv, valid_jd
+):
+    session_id = client.post(
+        "/start", json={"cv_text": valid_cv, "jd_text": valid_jd}
+    ).json()["session_id"]
+
+    response = client.get(f"/start/{session_id}/stream")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert '"type": "token"' in response.text
+    assert '"type": "done"' in response.text
+
+
+def test_stream_opening_question_unknown_session_returns_404(client):
+    response = client.get("/start/does-not-exist/stream")
+    assert response.status_code == 404

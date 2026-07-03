@@ -92,8 +92,12 @@ class Session(BaseModel):
     classification: Classification
     interview_plan: InterviewPlan
     transcript: list[Message] = Field(
-        min_length=1,
-        description="Ordered list of messages exchanged during the interview.",
+        default_factory=list,
+        description=(
+            "Ordered list of messages exchanged during the interview. Starts "
+            "empty — the opening question is appended once its streamed "
+            "generation completes, not at session creation."
+        ),
     )
     current_topic_index: int = Field(
         default=0, description="Index of the current topic in the interview plan."
@@ -170,6 +174,29 @@ class InterviewerTurn(BaseModel):
             "things with one of those words, delete everything after the "
             "connector and keep only the single most important thing."
         ),
+    )
+
+
+class InterviewerDecision(BaseModel):
+    """Same reasoning/action fields as InterviewerTurn, without 'question' —
+    used to decide follow_up vs advance quickly (structured, non-streamed)
+    before a separate call streams the actual question text."""
+
+    reasoning: str = Field(
+        min_length=1,
+        description=(
+            "Analyze the candidate's most recent answer before deciding: "
+            "was it complete, vague, or notably strong, and is the current "
+            "topic sufficiently covered? Think here first, then choose the "
+            "action."
+        ),
+    )
+    action: InterviewerAction = Field(
+        description=(
+            "Choose follow_up when the answer is vague, incomplete, or notably "
+            "strong and worth probing further on this topic; choose advance "
+            "when the topic is sufficiently covered."
+        )
     )
 
 class TopicScore(BaseModel):

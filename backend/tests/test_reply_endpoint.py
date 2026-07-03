@@ -1,4 +1,4 @@
-def test_reply_returns_next_question(client, started_session_id):
+def test_reply_returns_done_false_and_session_cost(client, started_session_id):
     response = client.post(
         "/reply", json={"session_id": started_session_id, "answer": "an answer"}
     )
@@ -6,17 +6,40 @@ def test_reply_returns_next_question(client, started_session_id):
     assert response.status_code == 200
     body = response.json()
     assert body["done"] is False
-    assert body["next_question"]
+    assert "session_cost" in body
+
+
+def test_stream_next_question_returns_token_and_done_events(
+    client, started_session_id
+):
+    client.post(
+        "/reply", json={"session_id": started_session_id, "answer": "an answer"}
+    )
+
+    response = client.get(f"/reply/{started_session_id}/stream")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/event-stream")
+    assert '"type": "token"' in response.text
+    assert '"type": "done"' in response.text
+
+
+def test_stream_next_question_unknown_session_returns_404(client):
+    response = client.get("/reply/does-not-exist/stream")
+    assert response.status_code == 404
 
 
 def test_reply_session_cost_tracks_turns(client, started_session_id):
     before = client.post(
         "/reply", json={"session_id": started_session_id, "answer": "an answer"}
     ).json()["session_cost"]
+    client.get(f"/reply/{started_session_id}/stream")  # populate the next question
 
-    after = client.post(
+    reply_response = client.post(
         "/reply", json={"session_id": started_session_id, "answer": "another answer"}
-    ).json()["session_cost"]
+    )
+    after = reply_response.json()["session_cost"]
+    client.get(f"/reply/{started_session_id}/stream")
 
     assert after["turns"] == before["turns"] + 1
     assert before["is_stub"] is True and after["is_stub"] is True

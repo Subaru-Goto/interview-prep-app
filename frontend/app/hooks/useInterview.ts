@@ -1,20 +1,18 @@
 "use client";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import type { Turn } from "../components/InterviewView";
 import type { Scorecard } from "../components/ScorecardView";
 import type { SessionCost } from "../components/SessionCostFooter";
-import { apiCall, apiErrorMessage } from "../lib/api";
+import { API_BASE_URL, apiCall, apiErrorMessage } from "../lib/api";
 
 interface StartResponse {
   session_id: string;
-  first_question: string;
   session_cost: SessionCost;
 }
 
 interface ReplyResponse {
   done: boolean;
-  next_question: string | null;
   session_cost: SessionCost;
 }
 
@@ -22,6 +20,11 @@ interface FinishResponse {
   scorecard: Scorecard;
   session_cost: SessionCost;
 }
+
+type QuestionStreamEvent =
+  | { type: "token"; text: string }
+  | { type: "done"; session_cost: SessionCost }
+  | { type: "error"; message: string };
 
 export function useInterview() {
   const [sessionId, setSessionId] = useState("");
@@ -36,6 +39,58 @@ export function useInterview() {
   const [isFinishing, setIsFinishing] = useState(false);
   const [finishError, setFinishError] = useState("");
   const [sessionCost, setSessionCost] = useState<SessionCost | null>(null);
+  const questionStream = useRef<EventSource | null>(null);
+
+  /** Stream a question (opening or follow-up) from `url`, appending it to
+   * the transcript token by token as it arrives. Shared by startInterview
+   * and submitReply — the only difference between the two is the endpoint
+   * and where errors should surface. */
+  function streamQuestion(url: string, onError: (message: string) => void) {
+    setIsReplying(true); // "nothing to show yet" — same signal for both cases
+    let receivedFirstToken = false;
+
+    const source = new EventSource(url);
+    questionStream.current = source;
+
+    source.onmessage = (event) => {
+      const payload: QuestionStreamEvent = JSON.parse(event.data);
+
+      if (payload.type === "token") {
+        if (!receivedFirstToken) {
+          receivedFirstToken = true;
+          setIsReplying(false);
+          setTranscript((prev) => [
+            ...prev,
+            { role: "interviewer", text: payload.text },
+          ]);
+        } else {
+          setTranscript((prev) => {
+            const updated = [...prev];
+            const last = updated[updated.length - 1];
+            updated[updated.length - 1] = { ...last, text: last.text + payload.text };
+            return updated;
+          });
+        }
+        return;
+      }
+
+      source.close();
+      questionStream.current = null;
+      if (payload.type === "done") {
+        setSessionCost(payload.session_cost);
+      } else {
+        setIsReplying(false);
+        onError(payload.message);
+      }
+    };
+
+    source.onerror = () => {
+      source.close();
+      questionStream.current = null;
+      setIsReplying(false);
+      onError("A network error occurred while loading the next question.");
+    };
+  }
 
   async function startInterview(cvText: string, jobDescription: string) {
     setIsStarting(true);
@@ -46,9 +101,13 @@ export function useInterview() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ cv_text: cvText, jd_text: jobDescription }),
       });
+      // Navigate to the interview screen immediately — don't wait for the
+      // opening question, which streams in separately once we're there.
       setSessionId(data.session_id);
-      setTranscript([{ role: "interviewer", text: data.first_question }]);
       setSessionCost(data.session_cost);
+      streamQuestion(`${API_BASE_URL}/start/${data.session_id}/stream`, (message) =>
+        setStartError("✗ " + message),
+      );
     } catch (error) {
       setStartError(
         apiErrorMessage(error, "An error occurred while starting the interview."),
@@ -96,24 +155,27 @@ export function useInterview() {
       });
       setSessionCost(data.session_cost);
       if (data.done) {
+        setIsReplying(false);
         setDone(true);
         await finishInterview();
       } else {
-        setTranscript((prev) => [
-          ...prev,
-          { role: "interviewer", text: data.next_question ?? "" },
-        ]);
+        streamQuestion(`${API_BASE_URL}/reply/${sessionId}/stream`, (message) =>
+          setReplyError("✗ " + message),
+        );
       }
     } catch (error) {
+      setIsReplying(false);
       setReplyError(
         apiErrorMessage(error, "A network error occurred — please try again."),
       );
-    } finally {
-      setIsReplying(false);
     }
   }
 
   function restart() {
+    // stop a still-streaming question from writing into the reset state
+    questionStream.current?.close();
+    questionStream.current = null;
+
     // keep cv/jd so a fresh run with the same inputs is one click away
     setSessionId("");
     setTranscript([]);

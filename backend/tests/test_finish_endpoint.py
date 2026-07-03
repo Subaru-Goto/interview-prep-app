@@ -19,6 +19,7 @@ def test_finish_returns_session_cost(client, started_session_id):
     client.post(
         "/reply", json={"session_id": started_session_id, "answer": "an answer"}
     )
+    client.get(f"/reply/{started_session_id}/stream")  # populate the follow-up question
 
     response = client.post("/finish", json={"session_id": started_session_id})
 
