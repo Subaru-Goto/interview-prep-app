@@ -1,4 +1,5 @@
 from abc import ABC, abstractmethod
+from collections.abc import Iterator
 from functools import lru_cache
 
 from openai import OpenAI
@@ -8,6 +9,7 @@ from app.config import ReasoningEffort, settings
 from app.schemas import (
     Classification,
     InterviewerAction,
+    InterviewerDecision,
     InterviewerTurn,
     InterviewPlan,
     InterviewTopic,
@@ -44,6 +46,18 @@ class LLMClient(ABC):
         reply into that Pydantic model (CompletionResult.parsed); otherwise
         return raw text (CompletionResult.content). seed is best-effort
         reproducibility, not a determinism guarantee."""
+        ...
+
+    @abstractmethod
+    def stream_complete(
+        self,
+        messages: list[dict],
+        reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
+    ) -> Iterator[tuple[str, Usage | None]]:
+        """Stream a plain-text completion (no response_schema — structured
+        output isn't streamed). Yields (text_chunk, None) for each token as
+        it arrives, then a final ("", usage) item carrying the completed
+        call's token/cost totals."""
         ...
 
 
@@ -89,6 +103,13 @@ class FakeLLMClient(LLMClient):
             )
             return CompletionResult(parsed=fake, usage=usage)
 
+        if response_schema is InterviewerDecision:
+            fake = InterviewerDecision(
+                reasoning="Fake reasoning for development.",
+                action=InterviewerAction.follow_up,
+            )
+            return CompletionResult(parsed=fake, usage=usage)
+
         if response_schema is Scorecard:
             fake = Scorecard(
                 overall_assessment="Fake assessment for development.",
@@ -107,6 +128,15 @@ class FakeLLMClient(LLMClient):
             return CompletionResult(parsed=fake, usage=usage)
 
         raise ValueError(f"No canned fake response for {response_schema.__name__}")
+
+    def stream_complete(
+        self,
+        messages: list[dict],
+        reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
+    ) -> Iterator[tuple[str, Usage | None]]:
+        for word in "[FAKE LLM] Fake streamed question".split(" "):
+            yield word + " ", None
+        yield "", Usage()
 
 
 class OpenRouterLLMClient(LLMClient):
@@ -157,6 +187,32 @@ class OpenRouterLLMClient(LLMClient):
         if response_schema is None:
             return CompletionResult(content=message.content, usage=usage)
         return CompletionResult(parsed=message.parsed, usage=usage)
+
+    def stream_complete(
+        self,
+        messages: list[dict],
+        reasoning_effort: ReasoningEffort = ReasoningEffort.medium,
+    ) -> Iterator[tuple[str, Usage | None]]:
+        extra_body = {"reasoning": {"effort": reasoning_effort.value}}
+        stream = self.client.chat.completions.create(
+            model=settings.model,
+            messages=messages,
+            extra_body=extra_body,
+            stream=True,
+            stream_options={"include_usage": True},
+        )
+        for chunk in stream:
+            # The final chunk carries usage and has no choices.
+            if chunk.usage is not None:
+                yield "", Usage(
+                    prompt_tokens=chunk.usage.prompt_tokens,
+                    completion_tokens=chunk.usage.completion_tokens,
+                    cost=getattr(chunk.usage, "cost", None) or 0.0,
+                )
+                continue
+            delta = chunk.choices[0].delta.content if chunk.choices else None
+            if delta:
+                yield delta, None
 
 
 # Cache the LLM client

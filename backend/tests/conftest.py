@@ -20,10 +20,13 @@ def client():
 
 @pytest.fixture
 def started_session_id(client, valid_cv, valid_jd):
-    """A session_id from a real /start call, for tests that need an existing
-    session but don't care how it was created."""
+    """A session_id with its opening question already asked (via /start then
+    draining GET /start/{id}/stream), for tests that need an existing,
+    ready-to-reply-to session but don't care how it was created."""
     response = client.post("/start", json={"cv_text": valid_cv, "jd_text": valid_jd})
-    return response.json()["session_id"]
+    session_id = response.json()["session_id"]
+    client.get(f"/start/{session_id}/stream")
+    return session_id
 
 
 @pytest.fixture

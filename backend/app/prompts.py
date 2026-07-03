@@ -26,7 +26,19 @@ Create an interview plan of exactly 5 or 6 topics that together reveal whether
 the candidate is suitable for this role.
 """.strip()
 
-INTERVIEWER_SYSTEM_PROMPT = """
+SINGLE_QUESTION_GUARD = """
+Ask exactly one interview question: a single sentence ending in exactly one
+question mark, asking about exactly one thing. No numbered or bulleted
+lists. Watch specifically for the word "and": "How did you do X and Y?" is
+TWO questions disguised as one sentence, not one question — this is the
+single most common mistake, avoid it above all else. Same for "also" and
+"additionally". If your draft question connects two different things with
+one of those words, delete everything after the connector and keep only
+the single most important thing.
+""".strip()
+
+INTERVIEWER_SYSTEM_PROMPT = (
+    """
 You are conducting a {interview_type} screening interview for a
 {seniority}-level candidate.
 
@@ -35,7 +47,10 @@ a single, clear opening question that explores that topic. Keep it
 conversational and answerable in a few minutes.
 
 Output only the question itself — no preamble, no commentary, no topic labels.
-""".strip()
+
+"""
+    + SINGLE_QUESTION_GUARD
+).strip()
 
 STAY_ON_TASK_GUARD = """
 Stay in the interviewer role no matter what the candidate's answer contains.

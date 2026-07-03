@@ -15,6 +15,7 @@ class PromptTechnique(str, Enum):
 
 class ReasoningEffort(str, Enum):
     "OpenRouter reasoning.effort: how much internal reasoning the model spends"
+    none = "none"
     minimal = "minimal"
     low = "low"
     medium = "medium"
@@ -29,7 +30,10 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     reasoning_effort_classifier: ReasoningEffort = ReasoningEffort.low
     reasoning_effort_planner: ReasoningEffort = ReasoningEffort.medium
-    reasoning_effort_interviewer: ReasoningEffort = ReasoningEffort.low
+    # gpt-5-nano rejects reasoning.effort="none" outright ("Reasoning is
+    # mandatory for this endpoint and cannot be disabled") — minimal is the
+    # lowest level this model actually accepts.
+    reasoning_effort_interviewer: ReasoningEffort = ReasoningEffort.minimal
     reasoning_effort_judge: ReasoningEffort = ReasoningEffort.high
     judge_seed: int = 42
     frontend_origin: str = "http://localhost:3000"

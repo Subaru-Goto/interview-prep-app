@@ -2,6 +2,7 @@ import logging
 
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from pypdf.errors import PdfReadError
 
@@ -9,10 +10,13 @@ from app.config import settings
 from app.cv_parser import parse_cv
 from app.input_guard import InvalidInput
 from app.interview_engine import (
+    Transition,
+    decide_and_advance,
     finish_interview,
     get_session_cost,
-    reply,
     start_interview,
+    stream_first_question,
+    stream_reply_question,
 )
 from app.schemas import Scorecard, SessionCost
 from app.session_store import SessionNotFound, session_store
@@ -26,7 +30,6 @@ class StartRequest(BaseModel):
 
 class StartResponse(BaseModel):
     session_id: str
-    first_question: str
     session_cost: SessionCost
 
 class FinishRequest(BaseModel):
@@ -67,11 +70,14 @@ async def upload_cv(file: UploadFile = File(...)):
 
 @app.post("/start", response_model=StartResponse)
 def start(request: StartRequest):
-    """Classify the role, build an interview plan, and return the first
-    question plus a new session_id. 400 on invalid CV/JD input, 500 if the
-    server is misconfigured, 502 on any other LLM/upstream failure."""
+    """Classify the role, build an interview plan, and return a new
+    session_id with an empty transcript — the frontend should navigate to
+    the interview screen immediately, then call
+    GET /start/{session_id}/stream to receive the opening question. 400 on
+    invalid CV/JD input, 500 if the server is misconfigured, 502 on any
+    other LLM/upstream failure."""
     try:
-        session_id, question = start_interview(request.cv_text, request.jd_text)
+        session_id = start_interview(request.cv_text, request.jd_text)
     except InvalidInput as e:
         raise HTTPException(400, str(e)) from e
     except ValueError as e:
@@ -82,9 +88,24 @@ def start(request: StartRequest):
         raise HTTPException(502, "Could not start the interview") from e
     return {
         "session_id": session_id,
-        "first_question": question,
         "session_cost": get_session_cost(session_id),
     }
+
+
+@app.get("/start/{session_id}/stream")
+def stream_opening_question(session_id: str):
+    """Stream the opening question generated for session_id as Server-Sent
+    Events: 'token' events carry each text chunk, a final 'done' event
+    carries the updated session_cost, or an 'error' event if generation
+    fails mid-stream. 404 if session_id is unknown (checked before the
+    stream starts, so this is a clean HTTP error, not an in-stream one)."""
+    try:
+        session_store.get(session_id)
+    except SessionNotFound as e:
+        raise HTTPException(404, str(e)) from e
+    return StreamingResponse(
+        stream_first_question(session_id), media_type="text/event-stream"
+    )
 
 
 class ReplyRequest(BaseModel):
@@ -93,17 +114,17 @@ class ReplyRequest(BaseModel):
 
 class ReplyResponse(BaseModel):
     done: bool
-    next_question: str | None
     session_cost: SessionCost
 
 @app.post("/reply", response_model=ReplyResponse)
 def submit_reply(request: ReplyRequest):
-    """Submit the candidate's answer and get back the next question, or
-    done=True with next_question=None once the interview ends. 400 on an
-    empty/invalid answer, 404 if session_id is unknown, 500 if the server is
-    misconfigured, 502 on any other LLM/upstream failure."""
+    """Submit the candidate's answer and decide the next state (fast,
+    non-streamed). If done=False, call GET /reply/{session_id}/stream next
+    to receive the next question. 400 on an empty/invalid answer, 404 if
+    session_id is unknown, 500 if the server is misconfigured, 502 on any
+    other LLM/upstream failure."""
     try:
-        done, question = reply(request.session_id, request.answer)
+        outcome = decide_and_advance(request.session_id, request.answer)
     except InvalidInput as e:
         raise HTTPException(400, str(e)) from e
     except SessionNotFound as e:
@@ -115,10 +136,24 @@ def submit_reply(request: ReplyRequest):
         logger.error("Reply request failed", exc_info=True)
         raise HTTPException(502, "Could not process your reply") from e
     return {
-        "done": done,
-        "next_question": question,
+        "done": outcome == Transition.finish,
         "session_cost": get_session_cost(request.session_id),
     }
+
+
+@app.get("/reply/{session_id}/stream")
+def stream_next_question(session_id: str):
+    """Stream the interviewer's next question for session_id as
+    Server-Sent Events, following a /reply call whose response had
+    done=False. Same event shape as GET /start/{session_id}/stream. 404 if
+    session_id is unknown."""
+    try:
+        session_store.get(session_id)
+    except SessionNotFound as e:
+        raise HTTPException(404, str(e)) from e
+    return StreamingResponse(
+        stream_reply_question(session_id), media_type="text/event-stream"
+    )
 
 @app.post("/finish", response_model=FinishResponse)
 def finish_and_feedback(request: FinishRequest):

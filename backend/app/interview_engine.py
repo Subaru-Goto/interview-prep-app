@@ -1,4 +1,6 @@
+import json
 import logging
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 from enum import Enum
 from uuid import uuid4
@@ -20,11 +22,12 @@ from app.prompts import (
     INTERVIEWER_SYSTEM_PROMPT,
     JD_TAG,
     JUDGE_SYSTEM_PROMPT,
+    SINGLE_QUESTION_GUARD,
 )
 from app.schemas import (
     Classification,
     InterviewerAction,
-    InterviewerTurn,
+    InterviewerDecision,
     InterviewPlan,
     Message,
     MessageRole,
@@ -73,9 +76,16 @@ def _messages(system: str, user: str) -> list[dict]:
     ]
 
 
-def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
-    """Validate inputs, classify + plan the interview, produce the first
-    question, persist the session, and return (session_id, first_question)."""
+def sse_event(event_type: str, data: dict) -> str:
+    """Format one Server-Sent Events frame carrying a JSON payload."""
+    return f"data: {json.dumps({'type': event_type, **data})}\n\n"
+
+
+def start_interview(cv_text: str, jd_text: str) -> str:
+    """Validate inputs, classify + plan the interview, and persist a session
+    with an empty transcript. Returns session_id. Does not generate the
+    opening question — call stream_first_question(session_id) next, so the
+    frontend can move to the interview screen before that text exists."""
     jd = validate_inputs(cv_text, jd_text)
     client = get_llm_client()
 
@@ -99,35 +109,53 @@ def start_interview(cv_text: str, jd_text: str) -> tuple[str, str]:
         classification_result = classification_future.result()
         plan_result = plan_future.result()
 
-    classification = classification_result.parsed
-    plan = plan_result.parsed
-
-    first_topic = plan.topics[0]
-    # implement the classified roles and
-    interviewer_system = INTERVIEWER_SYSTEM_PROMPT.format(
-        interview_type=classification.interview_type.value,
-        seniority=classification.seniority.value,
-    )
-
-    topic_context = f"Topic: {first_topic.title}\nFocus: {first_topic.focus}"
-    question_result = client.complete(
-        _messages(interviewer_system, topic_context),
-        reasoning_effort=settings.reasoning_effort_interviewer,
-        response_schema=None,
-    )
-    first_question = question_result.content
-
     session = Session(
         session_id=str(uuid4()),
-        classification=classification,
-        interview_plan=plan,
-        transcript=[Message(role=MessageRole.assistant, content=first_question)],
+        classification=classification_result.parsed,
+        interview_plan=plan_result.parsed,
+        transcript=[],
     )
-    for result in (classification_result, plan_result, question_result):
+    for result in (classification_result, plan_result):
         _accumulate_usage(session, result.usage)
     session_store.save(session)
 
-    return session.session_id, first_question
+    return session.session_id
+
+
+def stream_first_question(session_id: str) -> Iterator[str]:
+    """Stream the interview's opening question as SSE 'token' events, append
+    it to the session's transcript once complete, then yield a final 'done'
+    event carrying the updated session_cost. Raises SessionNotFound (before
+    any streaming starts) if session_id doesn't exist."""
+    session = session_store.get(session_id)
+    first_topic = session.interview_plan.topics[0]
+    interviewer_system = INTERVIEWER_SYSTEM_PROMPT.format(
+        interview_type=session.classification.interview_type.value,
+        seniority=session.classification.seniority.value,
+    )
+    topic_context = f"Topic: {first_topic.title}\nFocus: {first_topic.focus}"
+    messages = _messages(interviewer_system, topic_context)
+
+    full_text = ""
+    try:
+        for chunk, usage in get_llm_client().stream_complete(
+            messages, reasoning_effort=settings.reasoning_effort_interviewer
+        ):
+            if usage is not None:
+                _accumulate_usage(session, usage)
+                continue
+            full_text += chunk
+            yield sse_event("token", {"text": chunk})
+    except Exception:
+        logger.error("Streaming the opening question failed", exc_info=True)
+        yield sse_event(
+            "error", {"message": "Could not generate the opening question."}
+        )
+        return
+
+    session.transcript.append(Message(role=MessageRole.assistant, content=full_text))
+    session_store.save(session)
+    yield sse_event("done", {"session_cost": get_session_cost(session_id).model_dump()})
 
 
 class Transition(str, Enum):
@@ -196,29 +224,33 @@ def _build_interviewer_messages(session: Session) -> list[dict]:
     return messages
 
 
-def reply(session_id: str, answer: str) -> tuple[bool, str | None]:
-    """Record the candidate's answer, get the interviewer's next turn, and
-    advance the session state. Returns (True, None) once the interview ends,
-    or (False, next_question) otherwise. Raises InvalidInput on an empty/
-    invalid answer, SessionNotFound if session_id doesn't exist."""
+def decide_and_advance(session_id: str, answer: str) -> Transition:
+    """Record the candidate's answer, ask the interviewer LLM whether to
+    follow up or advance (fast, structured, non-streamed), and update the
+    session's topic/follow-up state accordingly. Returns the resolved
+    Transition; Transition.finish means the interview is over — the caller
+    should not stream a question. Otherwise, call
+    stream_reply_question(session_id) next for the actual question text.
+    Raises InvalidInput on an empty/invalid answer, SessionNotFound if
+    session_id doesn't exist."""
     cleaned_answer = validate_answer(answer)
     session = session_store.get(session_id)
 
     session.transcript.append(Message(role=MessageRole.user, content=cleaned_answer))
 
-    turn_result = get_llm_client().complete(
+    decision_result = get_llm_client().complete(
         _build_interviewer_messages(session),
         reasoning_effort=settings.reasoning_effort_interviewer,
-        response_schema=InterviewerTurn,
+        response_schema=InterviewerDecision,
     )
-    turn = turn_result.parsed
-    _accumulate_usage(session, turn_result.usage)
+    decision = decision_result.parsed
+    _accumulate_usage(session, decision_result.usage)
 
     questions_asked = sum(
         1 for m in session.transcript if m.role == MessageRole.assistant
     )
     outcome = resolve_transition(
-        turn.action,
+        decision.action,
         session.followups_asked,
         session.current_topic_index,
         len(session.interview_plan.topics),
@@ -227,21 +259,44 @@ def reply(session_id: str, answer: str) -> tuple[bool, str | None]:
         settings.max_followups_per_topic,
     )
 
-    if outcome == Transition.finish:
-        session_store.save(session)
-        return True, None
-
     if outcome == Transition.follow_up:
         session.followups_asked += 1
-    else:  # advance to the next topic
+    elif outcome == Transition.advance:
         session.current_topic_index += 1
         session.followups_asked = 0
 
-    session.transcript.append(
-        Message(role=MessageRole.assistant, content=turn.question)
-    )
     session_store.save(session)
-    return False, turn.question
+    return outcome
+
+
+def stream_reply_question(session_id: str) -> Iterator[str]:
+    """Stream the interviewer's next question as SSE 'token' events, append
+    it to the transcript, then yield a final 'done' event carrying the
+    updated session_cost. Only call after decide_and_advance() returns a
+    non-finish Transition. Raises SessionNotFound (before any streaming
+    starts) if session_id doesn't exist."""
+    session = session_store.get(session_id)
+    messages = _build_interviewer_messages(session)
+    messages[0]["content"] += "\n\n" + SINGLE_QUESTION_GUARD
+
+    full_text = ""
+    try:
+        for chunk, usage in get_llm_client().stream_complete(
+            messages, reasoning_effort=settings.reasoning_effort_interviewer
+        ):
+            if usage is not None:
+                _accumulate_usage(session, usage)
+                continue
+            full_text += chunk
+            yield sse_event("token", {"text": chunk})
+    except Exception:
+        logger.error("Streaming the reply question failed", exc_info=True)
+        yield sse_event("error", {"message": "Could not generate the next question."})
+        return
+
+    session.transcript.append(Message(role=MessageRole.assistant, content=full_text))
+    session_store.save(session)
+    yield sse_event("done", {"session_cost": get_session_cost(session_id).model_dump()})
 
 
 def _build_judge_messages(session: Session) -> list[dict]:
